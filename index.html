@@ -68,7 +68,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 5px;b
     </div>
   </div>
   <div class="form-group">
-    <div class="label-row"><label for="annualRate">年化利率（%）</label><button type="button" class="secondary small" id="refreshRate">尝试获取行情</button></div>
+    <div class="label-row"><label for="annualRate">年化利率（%）</label><button type="button" class="secondary small" id="refreshRate">尝试获取行情 ↻</button></div>
     <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.55">
     <div class="quick-tags">
       <div class="tag" data-rate="1.5">1.50%</div><div class="tag" data-rate="2">2.00%</div>
@@ -182,10 +182,8 @@ function renderRecords() {
   const sum = key => records.reduce((acc,r)=>acc+(Number(r[key])||0),0);
   $('totalCount').textContent = records.length;
   $('totalAmount').textContent = fmtMoney(sum('amount'));
-  $('totalGross').textContent = fmtMoney(sum('gross'));
-  $('totalFee').textContent = fmtMoney(sum('fee'));
-  $('totalNet').textContent = fmtMoney(sum('net'));
-  $('averageNet').textContent = fmtMoney(records.length ? sum('net')/records.length : 0);
+  $('totalGross').textContent = fmtMoney(sum('gross'));$('totalFee').textContent = fmtMoney(sum('fee'));
+  $('totalNet').textContent = fmtMoney(sum('net'));$('averageNet').textContent = fmtMoney(records.length ? sum('net')/records.length : 0);
   const body = $('recordsBody');
   body.innerHTML = '';
   if (!records.length) {
@@ -220,9 +218,6 @@ function calculate() {
   if (!Number.isFinite(rate) || rate < 0 || rate > 100) return alert('年化利率请输入 0 至 100 之间的数值。');
   if (!Number.isFinite(feeRate) || feeRate < 0) return alert('请检查佣金费率。');
 
-  // 明确标注为估算：采用交易日后首个工作日作为首次结算日；
-  // 以首次结算日加期限作为目标日，若落在周末则顺延到工作日。
-  // 官方节假日和各市场实际结算安排未内置，跨节假日时必须核实。
   const firstSettlement = nextWeekday(tradeDate);
   const targetDate = addDays(firstSettlement, days);
   const finalSettlement = nextWeekday(targetDate, true);
@@ -231,7 +226,6 @@ function calculate() {
   const fee = amount * feeRate;
   const net = gross - fee;
   const effectiveRate = amount > 0 && actualDays > 0 ? net / amount / actualDays * 365 * 100 : 0;
-  // 下列资金日期仅作工作日估算，不等同券商最终结算承诺。
   const available = new Date(finalSettlement);
   const withdrawable = nextWeekday(finalSettlement);
 
@@ -245,16 +239,11 @@ function calculate() {
   };
   $('resultCard').hidden = false;
   $('netIncome').textContent = fmtMoney(net);
-  $('actualRate').textContent = effectiveRate.toFixed(3) + '%';
-  $('grossInterest').textContent = fmtMoney(gross);
-  $('commission').textContent = fmtMoney(fee);
-  $('actualDays').textContent = actualDays + ' 天';
-  $('outTradeDate').textContent = dateString(tradeDate);
-  $('firstSettlement').textContent = fmtDate(firstSettlement);
-  $('finalSettlement').textContent = fmtDate(finalSettlement);
-  $('availableDate').textContent = fmtDate(available);
-  $('withdrawableDate').textContent = fmtDate(withdrawable);
-  $('calcNote').textContent = '此结果为估算。当前只跳过周六、周日，未识别法定节假日；资金可用/可取日须以券商实际结算信息为准。';
+  $('actualRate').textContent = effectiveRate.toFixed(3) + '\%';$('grossInterest').textContent = fmtMoney(gross);
+  $('commission').textContent = fmtMoney(fee);$('actualDays').textContent = actualDays + ' 天';
+  $('outTradeDate').textContent = dateString(tradeDate);$('firstSettlement').textContent = fmtDate(firstSettlement);
+  $('finalSettlement').textContent = fmtDate(finalSettlement);$('availableDate').textContent = fmtDate(available);
+  $('withdrawableDate').textContent = fmtDate(withdrawable);$('calcNote').textContent = '此结果为估算。当前只跳过周六、周日，未识别法定节假日；资金可用/可取日须以券商实际结算信息为准。';
   $('saveRecord').textContent = '保存本次交易记录';
 }
 function setActive(container, selector, chosen) {
@@ -277,8 +266,7 @@ $('nominalDays').addEventListener('input', () => {
   const match = [...$('dayTags').querySelectorAll('[data-days]')].find(t=>Number(t.dataset.days)===Number($('nominalDays').value));
   setActive($('dayTags'),'[data-days]',match);
 });
-$('calculateBtn').addEventListener('click', calculate);
-$('saveRecord').addEventListener('click', () => {
+$('calculateBtn').addEventListener('click', calculate);$('saveRecord').addEventListener('click', () => {
   if (!latestCalculation) return alert('请先完成测算。');
   const records = readRecords();
   records.push(latestCalculation);
@@ -319,11 +307,43 @@ $('importJson').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-// 行情获取采取保守策略：不将未经验证的数据冒充实时行情。
-$('refreshRate').addEventListener('click', () => {
-  $('rateStatus').textContent = '未自动填入行情。请查看券商交易页面的最新报价后手动输入，以避免跨域或接口变化造成误报。';
-  alert('为避免把失效或错位的行情字段当作实时利率，本版本不自动覆盖利率。请以券商交易页面报价为准，再手动输入。');
+// 行情获取函数（修复动态 JSONP 脚本注入）
+$('refreshRate').addEventListener('click', () => {$('rateStatus').textContent = '正在获取实时盘面...';
+  const oldScript = document.getElementById('market_script');
+  if (oldScript) oldScript.remove();
+
+  const script = document.createElement('script');
+  script.id = 'market_script';
+  script.src = 'https://qt.gtimg.cn/q=sz131810,sh201001&_=' + Date.now();
+
+  script.onload = function() {
+    try {
+      let gc001 = 0, r001 = 0;
+      if (typeof v_sh201001 !== 'undefined' && v_sh201001) {
+        gc001 = parseFloat(v_sh201001.split('~')[3]) || 0;
+      }
+      if (typeof v_sz131810 !== 'undefined' && v_sz131810) {
+        r001 = parseFloat(v_sz131810.split('~')[3]) || 0;
+      }
+      if (gc001 > 0 || r001 > 0) {
+        if (gc001 > 0) $('annualRate').value = gc001.toFixed(3);$('rateStatus').textContent = `已更新 | 沪GC001: ${gc001}%，深R-001: ${r001}%（以券商成交价为准）`;
+      } else {
+        $('rateStatus').textContent = '当前非交易时间（15:30后或周末盘面无报价），请手动输入。';
+      }
+    } catch(e) {
+      $('rateStatus').textContent = '行情解析失败，请手动输入。';
+    }
+    if (document.body.contains(script)) script.remove();
+  };
+
+  script.onerror = function() {
+    $('rateStatus').textContent = '网络或跨域拦截导致获取失败，请手动输入最新报价。';
+    if (document.body.contains(script)) script.remove();
+  };
+
+  document.body.appendChild(script);
 });
+
 $('tradeDate').value = dateString(new Date());
 renderRecords();
 </script>
