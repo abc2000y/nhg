@@ -70,9 +70,9 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 5px;b
   <div class="form-group">
     <div class="label-row"><label for="annualRate">年化利率（%）</label><button type="button" class="secondary small" id="refreshRate">尝试获取行情 ↻</button></div>
     <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.55">
-    <div class="quick-tags">
-      <div class="tag" data-rate="1.5">1.50%</div><div class="tag" data-rate="2">2.00%</div>
-      <div class="tag active" data-rate="2.55">2.55%</div><div class="tag" data-rate="3">3.00%</div>
+    <div class="quick-tags" id="rateTags">
+      <div class="tag active" data-rate="2.55">2.55%</div><div class="tag" data-rate="2">2.00%</div>
+      <div class="tag" data-rate="1.5">1.50%</div><div class="tag" data-rate="3">3.00%</div>
     </div>
     <div class="hint" id="rateStatus">当前为手动输入利率；请以券商交易页面的实际报价为准。</div>
   </div>
@@ -307,7 +307,7 @@ $('importJson').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-// 行情获取函数（修复动态 JSONP 脚本注入）
+// 行情获取函数（自动挑选有效非0利率，并更新填入第一个快捷标签）
 $('refreshRate').addEventListener('click', () => {$('rateStatus').textContent = '正在获取实时盘面...';
   const oldScript = document.getElementById('market_script');
   if (oldScript) oldScript.remove();
@@ -325,8 +325,28 @@ $('refreshRate').addEventListener('click', () => {$('rateStatus').textContent = 
       if (typeof v_sz131810 !== 'undefined' && v_sz131810) {
         r001 = parseFloat(v_sz131810.split('~')[3]) || 0;
       }
-      if (gc001 > 0 || r001 > 0) {
-        if (gc001 > 0) $('annualRate').value = gc001.toFixed(3);$('rateStatus').textContent = `已更新 | 沪GC001: ${gc001}%，深R-001: ${r001}%（以券商成交价为准）`;
+
+      // 优先取有值的行情（优先沪市，若沪市为0则自动取深市）
+      const validRate = gc001 > 0 ? gc001 : (r001 > 0 ? r001 : 0);
+
+      if (validRate > 0) {
+        const rateVal = validRate.toFixed(3);
+        
+        // 1. 填入输入框
+        $('annualRate').value = rateVal;
+
+        // 2. 更新最左侧第一个点选框，并激活选中状态
+        const firstRateTag = document.querySelector('[data-rate]');
+        if (firstRateTag) {
+          firstRateTag.dataset.rate = rateVal;
+          firstRateTag.textContent = rateVal + '%';
+          
+          document.querySelectorAll('[data-rate]').forEach(t => {
+            t.classList.toggle('active', t === firstRateTag);
+          });
+        }
+
+        $('rateStatus').textContent = `已更新 | 沪GC001: ${gc001}%，深R-001: ${r001}%（以券商成交价为准）`;
       } else {
         $('rateStatus').textContent = '当前非交易时间（15:30后或周末盘面无报价），请手动输入。';
       }
