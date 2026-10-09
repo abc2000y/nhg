@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#3370ff">
-<title>国债逆回购收益测算</title>
+<title>国债逆回购计算器</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px;color:#1f2329;max-width:760px;margin:auto}
@@ -19,7 +19,16 @@ input,select{width:100%;height:44px;border:1px solid #d9dee8;border-radius:10px;
 button{border:0;cursor:pointer;font-size:14px;border-radius:10px;padding:11px 13px}
 .primary{width:100%;height:47px;background:#3370ff;color:#fff;border-radius:24px;font-size:16px;font-weight:650;margin-top:3px}
 .secondary{background:#edf3ff;color:#245bdb}.danger{background:#fff0f0;color:#d93036}.small{font-size:12px;padding:8px 10px}
-.notice{background:#fff8e8;border:1px solid #ffe2a8;color:#855b00;padding:10px 11px;border-radius:10px;font-size:12px;line-height:1.6;margin-bottom:13px}
+
+/* 可折叠提示框样式 */
+.notice{background:#fff8e8;border:1px solid #ffe2a8;color:#855b00;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.6;margin-bottom:13px;cursor:pointer}
+.notice-header{display:flex;justify-content:space-between;align-items:center;font-weight:bold}
+.notice-body{margin-top:6px;display:none}
+.notice.open .notice-body{display:block}
+
+/* 一键获取全品种长条按钮 */
+.full-width-btn{width:100%;height:42px;background:#edf3ff;color:#245bdb;border:1px solid #3370ff;border-radius:10px;font-size:14px;font-weight:600;margin-top:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.stat{background:#f6f8fb;border-radius:12px;padding:13px;text-align:center;min-width:0}.stat.primaryStat{background:#fff0f0}
 .statLabel{font-size:12px;color:#7b8494}.statNum{font-size:21px;font-weight:750;margin-top:5px;overflow-wrap:anywhere}.red{color:#e5484d}.blue{color:#245bdb}.green{color:#16803c}
 .rowline{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:13px}.rowline span:first-child{color:#7b8494}.rowline span:last-child{text-align:right;font-weight:600}
@@ -37,8 +46,15 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 5px;b
   <div class="subtitle">手机适用 · 本地保存交易记录 · 累计收益统计</div>
 </div>
 
-<div class="notice">
-  <b>计算提示：</b>日期按“周一至周五”为交易日进行估算，暂未内置交易所法定节假日/临时休市日历。跨节假日交易前请核对券商或交易所结算安排。行情自动获取可能受网络、浏览器跨域策略或行情接口变化影响；未核实的报价不会被标记为实时行情。
+<!-- 改动 1：可折叠提示框 -->
+<div class="notice" id="noticeBox">
+  <div class="notice-header">
+    <span>💡 计算与交易提示（点击展开/收起）</span>
+    <span id="noticeArrow">▼</span>
+  </div>
+  <div class="notice-body" id="noticeBody">
+    日期按“周一至周五”为交易日进行估算，暂未内置交易所法定节假日/临时休市日历。跨节假日交易前请核对券商或交易所结算安排。行情自动获取可能受网络、浏览器跨域策略或行情接口变化影响；未核实的报价不会被标记为实时行情。
+  </div>
 </div>
 
 <div class="card">
@@ -67,15 +83,18 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 5px;b
       <div class="tag" data-amount="100000">10万元</div><div class="tag" data-amount="500000">50万元</div>
     </div>
   </div>
+  
+  <!-- 改动 2：整合为单一行年化输入 + 一键全品种按钮 -->
   <div class="form-group">
-    <div class="label-row"><label for="annualRate">年化利率（%）</label><button type="button" class="secondary small" id="refreshRate">一键获取全品种行情 ↻</button></div>
+    <div class="label-row"><label for="annualRate">年化利率（%）</label></div>
     <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.55">
-    <div class="quick-tags" id="rateTags">
-      <div class="tag active" data-rate="2.55">2.55%</div><div class="tag" data-rate="2">2.00%</div>
-      <div class="tag" data-rate="1.5">1.50%</div><div class="tag" data-rate="3">3.00%</div>
-    </div>
-    <div class="hint" id="rateStatus">当前为手动输入利率；请以券商交易页面的实际报价为准。</div>
+    
+    <button type="button" class="full-width-btn" id="refreshRate">
+      一键获取全品种年化利率（%） ↻
+    </button>
+    <div class="hint" id="rateStatus" style="display:none; margin-top: 6px;"></div>
   </div>
+
   <div class="form-group">
     <div class="label-row"><label for="feeRate">佣金费率（按成交金额）</label></div>
     <select id="feeRate">
@@ -141,6 +160,13 @@ const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'repo_calculator_records_v2';
 let latestCalculation = null;
 
+// 折叠/展开计算提示
+$('noticeBox').addEventListener('click', () => {
+  const box = $('noticeBox');
+  const isOpened = box.classList.toggle('open');
+  $('noticeArrow').textContent = isOpened ? '▲' : '▼';
+});
+
 // 全品种代码映射
 const CODE_MAP = {
   1:   { sh: 'sh201001', sz: 'sz131810', name: '1天' },
@@ -154,7 +180,6 @@ const CODE_MAP = {
   182: { sh: 'sh201182', sz: 'sz131806', name: '182天' }
 };
 
-// 用于缓存拉取到的所有天数最新利率 { 1: 1.85, 2: 1.90, ... }
 const rateCache = {};
 
 function parseLocalDate(value) {
@@ -266,7 +291,6 @@ function setActive(container, selector, chosen) {
   container.querySelectorAll(selector).forEach(el => el.classList.toggle('active', el === chosen));
 }
 
-// 切换天数时，如果已有缓存，自动把该天数的最新利率填入
 $('dayTags').addEventListener('click', e => {
   const tag = e.target.closest('[data-days]'); if (!tag) return;
   const days = Number(tag.dataset.days);
@@ -276,13 +300,7 @@ $('dayTags').addEventListener('click', e => {
   if (rateCache[days]) {
     const rateVal = rateCache[days].toFixed(3);
     $('annualRate').value = rateVal;
-    const firstRateTag = document.querySelector('[data-rate]');
-    if (firstRateTag) {
-      firstRateTag.dataset.rate = rateVal;
-      firstRateTag.textContent = rateVal + '%';
-      document.querySelectorAll('[data-rate]').forEach(t => t.classList.toggle('active', t === firstRateTag));
-    }
-    $('rateStatus').textContent = `已自动加载 [${days}天期] 行情：${rateVal}%`;
+    $('rateStatus').style.display = 'block';$('rateStatus').textContent = `已自动加载 [${days}天期] 行情：${rateVal}%`;
   }
 });
 
@@ -290,11 +308,7 @@ document.querySelectorAll('[data-amount]').forEach(tag => tag.addEventListener('
   $('amount').value = tag.dataset.amount;
   document.querySelectorAll('[data-amount]').forEach(t=>t.classList.toggle('active',t===tag));
 }));
-document.querySelectorAll('[data-rate]').forEach(tag => tag.addEventListener('click', () => {
-  $('annualRate').value = tag.dataset.rate;
-  document.querySelectorAll('[data-rate]').forEach(t=>t.classList.toggle('active',t===tag));
-  $('rateStatus').textContent = '已选择手动参考利率；并非实时行情。';
-}));
+
 $('nominalDays').addEventListener('input', () => {
   const match = [...$('dayTags').querySelectorAll('[data-days]')].find(t=>Number(t.dataset.days)===Number($('nominalDays').value));
   setActive($('dayTags'),'[data-days]',match);
@@ -340,14 +354,12 @@ $('importJson').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-// 一键拉取所有天数（1到182天）全套品种的最新行情
-fetchAllRates();
+// 一键获取全品种行情函数
 $('refreshRate').addEventListener('click', fetchAllRates);
 
 function fetchAllRates() {
-  $('rateStatus').textContent = '正在获取全品种 (1~182天) 实时盘面...';
+  $('rateStatus').style.display = 'block';$('rateStatus').textContent = '正在获取全品种 (1~182天) 实时盘面...';
   
-  // 拼装所有代码请求字符串
   const codes = [];
   Object.values(CODE_MAP).forEach(item => {
     codes.push(item.sh, item.sz);
@@ -381,7 +393,6 @@ function fetchAllRates() {
           rateCache[days] = valid;
           updatedCount++;
 
-          // 核心优化：在天数标签上直接标注最新年化利率
           const tag = document.querySelector(`[data-days="${days}"]`);
           if (tag) {
             tag.textContent = `${days}天(${valid.toFixed(2)}%)`;
@@ -391,19 +402,11 @@ function fetchAllRates() {
 
       const currentDays = parseInt($('nominalDays').value) || 1;
       if (rateCache[currentDays]) {
-        const rateVal = rateCache[currentDays].toFixed(3);
-        $('annualRate').value = rateVal;
-
-        const firstRateTag = document.querySelector('[data-rate]');
-        if (firstRateTag) {
-          firstRateTag.dataset.rate = rateVal;
-          firstRateTag.textContent = rateVal + '%';
-          document.querySelectorAll('[data-rate]').forEach(t => t.classList.toggle('active', t === firstRateTag));
-        }
+        $('annualRate').value = rateCache[currentDays].toFixed(3);
       }
 
       if (updatedCount > 0) {
-        $('rateStatus').textContent = `全品种行情已同步！已获取 ${updatedCount} 个有效品种数据。切换天数可直接使用。`;
+        $('rateStatus').textContent = `行情已更新！已抓取 ${updatedCount} 个有效品种。切换天数可查看更多。`;
       } else {
         $('rateStatus').textContent = '当前非交易时间（15:30后或周末盘面无报价），请手动输入。';
       }
@@ -414,7 +417,7 @@ function fetchAllRates() {
   };
 
   script.onerror = function() {
-    $('rateStatus').textContent = '网络或跨域拦截导致获取失败，请手动输入最新报价。';
+    $('rateStatus').textContent = '网络或跨域拦截导致获取失败，请手动输入。';
     if (document.body.contains(script)) script.remove();
   };
 
