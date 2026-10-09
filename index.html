@@ -1,249 +1,331 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <!-- 核心修复：隐藏 Referer，绕过财经 API 的跨域/域名拦截 -->
-  <meta name="referrer" content="no-referrer">
-  <title>国债逆回购计算器</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background-color: #f6f8fa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; color: #1f2329; }
-    .header { text-align: center; margin-bottom: 20px; margin-top: 10px; }
-    .title { font-size: 22px; font-weight: bold; }
-    .subtitle { font-size: 13px; color: #8f959e; margin-top: 4px; }
-    .card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .form-group { margin-bottom: 16px; }
-    .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .label { font-size: 14px; color: #1f2329; font-weight: 500; }
-    .ref-link { font-size: 12px; color: #3370ff; cursor: pointer; }
-    .input-box { width: 100%; height: 44px; padding: 0 12px; font-size: 15px; border: 1px solid #dee0e3; border-radius: 10px; outline: none; }
-    .quick-tags { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-    .tag { flex: 1; min-width: 60px; text-align: center; padding: 8px 0; background: #f2f3f5; border-radius: 8px; font-size: 13px; color: #4e5969; cursor: pointer; }
-    .tag.active { background: #e8f3ff; color: #3370ff; font-weight: bold; border: 1px solid #3370ff; }
-    .rate-tag { background: #fff7e8; color: #ff7d00; border: 1px solid #ffe4ba; }
-    .btn-submit { width: 100%; height: 46px; background: linear-gradient(135deg, #3370ff 0%, #2e62e6 100%); color: #fff; border: none; border-radius: 23px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
-    
-    .stats-grid { display: flex; gap: 12px; margin: 16px 0; }
-    .stat-box { flex: 1; background: #f8f9fa; border-radius: 12px; padding: 12px; text-align: center; }
-    .stat-box.primary { background: #fff0f0; }
-    .stat-label { font-size: 12px; color: #8f959e; }
-    .stat-num { font-size: 20px; font-weight: bold; margin-top: 4px; }
-    .red { color: #f53f3f; }
-    .green { color: #00b42a; }
-    .detail-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; }
-    .divider { height: 1px; background: #eff0f1; margin: 8px 0; }
-    .highlight-date { color: #ff7d00; font-weight: bold; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#3370ff">
+<title>国债逆回购计算器</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px;color:#1f2329;max-width:760px;margin:auto}
+.header{text-align:center;margin:8px 0 18px}.title{font-size:23px;font-weight:750}.subtitle{font-size:12px;color:#7b8494;margin-top:6px}
+.card{background:#fff;border-radius:16px;padding:17px;margin-bottom:14px;box-shadow:0 3px 12px #172b4d0a}
+h2{font-size:16px;margin-bottom:14px}.form-group{margin-bottom:14px}.label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+label,.label{font-size:14px;font-weight:550}.hint{font-size:11px;color:#7b8494;line-height:1.55;margin-top:6px}
+input,select{width:100%;height:44px;border:1px solid #d9dee8;border-radius:10px;padding:0 11px;font-size:16px;background:#fff;color:#1f2329}
+.quick-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.tag{flex:1;min-width:52px;text-align:center;padding:9px 5px;background:#f1f3f7;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid transparent}
+.tag.active{background:#e8f1ff;color:#245bdb;border-color:#3370ff;font-weight:650}
+button{border:0;cursor:pointer;font-size:14px;border-radius:10px;padding:11px 13px}
+.primary{width:100%;height:47px;background:#3370ff;color:#fff;border-radius:24px;font-size:16px;font-weight:650;margin-top:3px}
+.secondary{background:#edf3ff;color:#245bdb}.danger{background:#fff0f0;color:#d93036}.small{font-size:12px;padding:8px 10px}
+.notice{background:#fff8e8;border:1px solid #ffe2a8;color:#855b00;padding:10px 11px;border-radius:10px;font-size:12px;line-height:1.6;margin-bottom:13px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.stat{background:#f6f8fb;border-radius:12px;padding:13px;text-align:center;min-width:0}.stat.primaryStat{background:#fff0f0}
+.statLabel{font-size:12px;color:#7b8494}.statNum{font-size:21px;font-weight:750;margin-top:5px;overflow-wrap:anywhere}.red{color:#e5484d}.blue{color:#245bdb}.green{color:#16803c}
+.rowline{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #f0f2f5;font-size:13px}.rowline span:first-child{color:#7b8494}.rowline span:last-child{text-align:right;font-weight:600}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px}
+.totalgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.totalbox{background:#f7f9fc;border-radius:10px;padding:12px}.totalbox .k{font-size:12px;color:#7b8494}.totalbox .v{font-size:18px;font-weight:750;margin-top:5px;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 5px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:#7b8494;font-weight:600}
+.tablewrap{overflow-x:auto}.empty{text-align:center;color:#8b93a1;padding:20px 0;font-size:13px}
+.footer{font-size:11px;color:#8b93a1;line-height:1.6;padding:0 3px 18px}
+@media(max-width:380px){body{padding:9px}.card{padding:13px}.statNum{font-size:18px}.rowline{font-size:12px}}
+</style>
 </head>
 <body>
+<div class="header">
+  <div class="title">国债逆回购收益测算</div>
+  <div class="subtitle">手机适用 · 本地保存交易记录 · 累计收益统计</div>
+</div>
 
-  <div class="header">
-    <div class="title">国债逆回购收益测算</div>
-    <div class="subtitle">随身单机版 · 支持行情自动拉取</div>
+<div class="notice">
+  <b>计算提示：</b>日期按“周一至周五”为交易日进行估算，暂未内置交易所法定节假日/临时休市日历。跨节假日交易前请核对券商或交易所结算安排。行情自动获取可能受网络、浏览器跨域策略或行情接口变化影响；未核实的报价不会被标记为实时行情。
+</div>
+
+<div class="card">
+  <h2>交易参数</h2>
+  <div class="form-group">
+    <div class="label-row"><label for="tradeDate">交易日期</label></div>
+    <input type="date" id="tradeDate">
+    <div class="hint">应选择实际交易日。若选择周末，程序会提醒你。</div>
   </div>
-
-  <div class="card">
-    <div class="form-group">
-      <label class="label">交易日期</label>
-      <input type="date" id="tradeDate" class="input-box">
-    </div>
-
-    <div class="form-group">
-      <label class="label">品种天数 (天)</label>
-      <input type="number" id="nominalDays" class="input-box" value="1">
-      <div class="quick-tags">
-        <div class="tag active" onclick="setDays(1, this)">1天</div>
-        <div class="tag" onclick="setDays(2, this)">2天</div>
-        <div class="tag" onclick="setDays(3, this)">3天</div>
-        <div class="tag" onclick="setDays(7, this)">7天</div>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="label">投资金额 (元)</label>
-      <input type="number" id="amount" class="input-box" value="100000">
-    </div>
-
-    <div class="form-group">
-      <div class="label-row">
-        <label class="label">盘面年化 (%)</label>
-        <span class="ref-link" onclick="fetchRatesFromClient()">刷新行情 ↻</span>
-      </div>
-      <input type="number" step="0.01" id="annualRate" class="input-box" value="2.55">
-      <div class="quick-tags" id="marketRateTags">
-        <div class="tag rate-tag">正在获取实时盘面...</div>
-      </div>
-    </div>
-
-    <button class="btn-submit" onclick="doCalculate()">开始测算</button>
-  </div>
-
-  <!-- 结果卡片 -->
-  <div class="card" id="resultCard" style="display: none;">
-    <div style="font-size: 16px; font-weight: bold;">测算结果汇总</div>
-    <div class="stats-grid">
-      <div class="stat-box primary">
-        <span class="stat-label">预计净收益</span>
-        <div class="stat-num red" id="netIncome">￥0.00</div>
-      </div>
-      <div class="stat-box">
-        <span class="stat-label">实际有效年化</span>
-        <div class="stat-num green" id="actualRate">0.00%</div>
-      </div>
-    </div>
-
-    <div class="detail-item">
-      <span style="color: #8f959e;">实际计息天数</span>
-      <span id="actualDays" style="font-weight: bold; color: #3370ff;">0 天</span>
-    </div>
-    <div class="detail-item">
-      <span style="color: #8f959e;">理论利息 / 佣金</span>
-      <span id="feeDetail">￥0 / ￥0</span>
-    </div>
-    <div class="divider"></div>
-    <div class="detail-item">
-      <span style="color: #8f959e;">首次结算日 (T+1)</span>
-      <span id="firstSettlement">-</span>
-    </div>
-    <div class="detail-item">
-      <span style="color: #8f959e;">到期清算日</span>
-      <span id="finalSettlement">-</span>
-    </div>
-    <div class="detail-item">
-      <span style="color: #8f959e;">资金可用/可取日</span>
-      <span id="withdrawableDate" class="highlight-date">-</span>
+  <div class="form-group">
+    <div class="label-row"><label for="nominalDays">品种期限（天）</label></div>
+    <input type="number" id="nominalDays" min="1" max="182" step="1" value="1">
+    <div class="quick-tags" id="dayTags">
+      <div class="tag active" data-days="1">1天</div><div class="tag" data-days="2">2天</div>
+      <div class="tag" data-days="3">3天</div><div class="tag" data-days="4">4天</div>
+      <div class="tag" data-days="7">7天</div><div class="tag" data-days="14">14天</div>
+      <div class="tag" data-days="28">28天</div><div class="tag" data-days="91">91天</div>
+      <div class="tag" data-days="182">182天</div>
     </div>
   </div>
+  <div class="form-group">
+    <div class="label-row"><label for="amount">投资金额（元）</label></div>
+    <input type="number" id="amount" min="1000" step="1000" value="100000">
+    <div class="quick-tags">
+      <div class="tag" data-amount="10000">1万元</div><div class="tag" data-amount="50000">5万元</div>
+      <div class="tag" data-amount="100000">10万元</div><div class="tag" data-amount="500000">50万元</div>
+    </div>
+  </div>
+  <div class="form-group">
+    <div class="label-row"><label for="annualRate">年化利率（%）</label><button type="button" class="secondary small" id="refreshRate">尝试获取行情</button></div>
+    <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.55">
+    <div class="quick-tags">
+      <div class="tag" data-rate="1.5">1.50%</div><div class="tag" data-rate="2">2.00%</div>
+      <div class="tag active" data-rate="2.55">2.55%</div><div class="tag" data-rate="3">3.00%</div>
+    </div>
+    <div class="hint" id="rateStatus">当前为手动输入利率；请以券商交易页面的实际报价为准。</div>
+  </div>
+  <div class="form-group">
+    <div class="label-row"><label for="feeRate">佣金费率（按成交金额）</label></div>
+    <select id="feeRate">
+      <option value="0.00001">0.001%（示例：1天常见参考）</option>
+      <option value="0.00002">0.002%（示例）</option>
+      <option value="0.00003">0.003%（示例）</option>
+      <option value="0.00005">0.005%（示例）</option>
+      <option value="0.0001">0.010%（示例）</option>
+      <option value="0.0002">0.020%（示例）</option>
+      <option value="0.0003">0.030%（示例）</option>
+      <option value="0">0%（自行确认）</option>
+    </select>
+    <div class="hint">费率仅供测算，请根据券商对具体品种的收费标准选择。不同期限/券商可能不同。</div>
+  </div>
+  <button class="primary" id="calculateBtn">开始测算</button>
+</div>
 
-  <script>
-    document.getElementById('tradeDate').valueAsDate = new Date();
+<div class="card" id="resultCard" hidden>
+  <h2>本次测算结果</h2>
+  <div class="stats">
+    <div class="stat primaryStat"><div class="statLabel">预计净收益</div><div class="statNum red" id="netIncome">￥0.00</div></div>
+    <div class="stat"><div class="statLabel">扣佣后年化（估算）</div><div class="statNum green" id="actualRate">0.000%</div></div>
+  </div>
+  <div class="rowline"><span>预计毛利息</span><span id="grossInterest">￥0.00</span></div>
+  <div class="rowline"><span>预计佣金</span><span id="commission">￥0.00</span></div>
+  <div class="rowline"><span>用于估算的计息天数</span><span id="actualDays">0 天</span></div>
+  <div class="rowline"><span>交易日期</span><span id="outTradeDate">-</span></div>
+  <div class="rowline"><span>预计首次结算日</span><span id="firstSettlement">-</span></div>
+  <div class="rowline"><span>估算到期结算日</span><span id="finalSettlement">-</span></div>
+  <div class="rowline"><span>预计资金可用日</span><span id="availableDate">-</span></div>
+  <div class="rowline"><span>预计资金可取日</span><span id="withdrawableDate">-</span></div>
+  <div class="hint" id="calcNote"></div>
+  <button type="button" class="primary" id="saveRecord" style="margin-top:14px">保存本次交易记录</button>
+</div>
 
-    window.onload = function() {
-      fetchRatesFromClient();
-    };
+<div class="card">
+  <div class="toolbar"><h2 style="margin:0">累计收益统计</h2><button type="button" class="danger small" id="clearRecords">清空记录</button></div>
+  <div class="totalgrid">
+    <div class="totalbox"><div class="k">记录笔数</div><div class="v" id="totalCount">0</div></div>
+    <div class="totalbox"><div class="k">累计投资金额</div><div class="v" id="totalAmount">￥0.00</div></div>
+    <div class="totalbox"><div class="k">累计毛利息</div><div class="v" id="totalGross">￥0.00</div></div>
+    <div class="totalbox"><div class="k">累计佣金</div><div class="v" id="totalFee">￥0.00</div></div>
+    <div class="totalbox"><div class="k">累计净收益</div><div class="v red" id="totalNet">￥0.00</div></div>
+    <div class="totalbox"><div class="k">平均每笔净收益</div><div class="v" id="averageNet">￥0.00</div></div>
+  </div>
+  <div class="hint">记录保存在当前浏览器的本地存储中。清除浏览器数据、换设备或换浏览器后，记录可能无法保留。</div>
+  <div class="tablewrap" style="margin-top:12px">
+    <table><thead><tr><th>交易日期</th><th>期限</th><th>金额</th><th>净收益</th><th>操作</th></tr></thead><tbody id="recordsBody"></tbody></table>
+  </div>
+  <div class="toolbar" style="margin-top:12px">
+    <button type="button" class="secondary small" id="exportCsv">导出 CSV</button>
+    <button type="button" class="secondary small" id="backupJson">备份记录 JSON</button>
+    <label class="secondary small" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer">导入备份<input type="file" id="importJson" accept=".json,application/json" style="display:none"></label>
+  </div>
+</div>
+<div class="footer">
+  本工具用于估算，不构成收益保证。实际利息、结算日期、资金可用/可取时间和费用，以交易所规则、证券公司交易系统及实际成交记录为准。日期估算暂按工作日逻辑处理，未内置官方交易日历。
+</div>
 
-    function fetchRatesFromClient() {
-      const container = document.getElementById('marketRateTags');
-      container.innerHTML = '<div class="tag rate-tag">正在获取实时盘面...</div>';
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const STORAGE_KEY = 'repo_calculator_records_v2';
+let latestCalculation = null;
 
-      // 动态注入腾讯财经行情 JS
-      const scriptId = 'qq_market_script';
-      const oldScript = document.getElementById(scriptId);
-      if (oldScript) oldScript.remove();
+function parseLocalDate(value) {
+  if (!value) return null;
+  const parts = value.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+  const d = new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0, 0);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function dateString(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+function isWeekend(date) { return date.getDay() === 0 || date.getDay() === 6; }
+function nextWeekday(date, includeToday=false) {
+  let d = new Date(date);
+  if (!includeToday) d = addDays(d, 1);
+  while (isWeekend(d)) d = addDays(d, 1);
+  return d;
+}
+function fmtMoney(n) {
+  return new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n)||0);
+}
+function fmtDate(d) { return dateString(d); }
+function readRecords() {
+  try {
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    return Array.isArray(data) ? data.filter(r => r && typeof r.id === 'string' && Number.isFinite(Number(r.net))) : [];
+  } catch (e) { return []; }
+}
+function writeRecords(records) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); return true; }
+  catch (e) { alert('保存失败：浏览器可能禁用了本地存储或空间不足。请先导出备份。'); return false; }
+}
+function renderRecords() {
+  const records = readRecords();
+  const sum = key => records.reduce((acc,r)=>acc+(Number(r[key])||0),0);
+  $('totalCount').textContent = records.length;
+  $('totalAmount').textContent = fmtMoney(sum('amount'));
+  $('totalGross').textContent = fmtMoney(sum('gross'));
+  $('totalFee').textContent = fmtMoney(sum('fee'));
+  $('totalNet').textContent = fmtMoney(sum('net'));
+  $('averageNet').textContent = fmtMoney(records.length ? sum('net')/records.length : 0);
+  const body = $('recordsBody');
+  body.innerHTML = '';
+  if (!records.length) {
+    const tr = document.createElement('tr'), td = document.createElement('td');
+    td.colSpan = 5; td.className = 'empty'; td.textContent = '暂无已保存记录';
+    tr.appendChild(td); body.appendChild(tr); return;
+  }
+  records.slice().reverse().forEach(r => {
+    const tr = document.createElement('tr');
+    [r.tradeDate, `${r.days}天`, fmtMoney(r.amount), fmtMoney(r.net)].forEach(value => {
+      const td = document.createElement('td'); td.textContent = value; tr.appendChild(td);
+    });
+    const td = document.createElement('td'), btn = document.createElement('button');
+    btn.className = 'danger small'; btn.textContent = '删除';
+    btn.addEventListener('click', () => {
+      if (!confirm('确定删除这条记录吗？')) return;
+      writeRecords(readRecords().filter(x => x.id !== r.id)); renderRecords();
+    });
+    td.appendChild(btn); tr.appendChild(td); body.appendChild(tr);
+  });
+}
+function calculate() {
+  const tradeDate = parseLocalDate($('tradeDate').value);
+  const days = Number($('nominalDays').value);
+  const amount = Number($('amount').value);
+  const rate = Number($('annualRate').value);
+  const feeRate = Number($('feeRate').value);
+  if (!tradeDate) return alert('请选择有效交易日期。');
+  if (isWeekend(tradeDate)) return alert('所选日期是周末，请选择实际交易日。');
+  if (!Number.isInteger(days) || days < 1 || days > 182) return alert('期限必须是 1 至 182 的整数天。');
+  if (!Number.isFinite(amount) || amount < 1000) return alert('投资金额至少为 1000 元。');
+  if (!Number.isFinite(rate) || rate < 0 || rate > 100) return alert('年化利率请输入 0 至 100 之间的数值。');
+  if (!Number.isFinite(feeRate) || feeRate < 0) return alert('请检查佣金费率。');
 
-      const script = document.createElement('script');
-      script.id = scriptId;
-      // 加上随机时间戳防缓存
-      script.src = 'https://qt.gtimg.cn/q=sz131810,sh201001&_=' + new Date().getTime();
+  // 明确标注为估算：采用交易日后首个工作日作为首次结算日；
+  // 以首次结算日加期限作为目标日，若落在周末则顺延到工作日。
+  // 官方节假日和各市场实际结算安排未内置，跨节假日时必须核实。
+  const firstSettlement = nextWeekday(tradeDate);
+  const targetDate = addDays(firstSettlement, days);
+  const finalSettlement = nextWeekday(targetDate, true);
+  const actualDays = Math.max(1, Math.round((finalSettlement-firstSettlement)/86400000));
+  const gross = amount * (rate/100) * actualDays / 365;
+  const fee = amount * feeRate;
+  const net = gross - fee;
+  const effectiveRate = amount > 0 && actualDays > 0 ? net / amount / actualDays * 365 * 100 : 0;
+  // 下列资金日期仅作工作日估算，不等同券商最终结算承诺。
+  const available = new Date(finalSettlement);
+  const withdrawable = nextWeekday(finalSettlement);
 
-      script.onload = function() {
-        try {
-          let gc001 = 0, r001 = 0;
-          if (typeof v_sh201001 !== 'undefined' && v_sh201001) {
-            const shData = v_sh201001.split('~');
-            gc001 = parseFloat(shData[3]) || parseFloat(shData[4]) || 0;
-          }
-          if (typeof v_sz131810 !== 'undefined' && v_sz131810) {
-            const szData = v_sz131810.split('~');
-            r001 = parseFloat(szData[3]) || parseFloat(szData[4]) || 0;
-          }
+  latestCalculation = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    tradeDate: dateString(tradeDate), days, amount, rate, feeRate,
+    firstSettlement: dateString(firstSettlement), finalSettlement: dateString(finalSettlement),
+    actualDays, gross: Number(gross.toFixed(2)), fee: Number(fee.toFixed(2)),
+    net: Number(net.toFixed(2)), effectiveRate: Number(effectiveRate.toFixed(4)),
+    createdAt: new Date().toISOString()
+  };
+  $('resultCard').hidden = false;
+  $('netIncome').textContent = fmtMoney(net);
+  $('actualRate').textContent = effectiveRate.toFixed(3) + '%';
+  $('grossInterest').textContent = fmtMoney(gross);
+  $('commission').textContent = fmtMoney(fee);
+  $('actualDays').textContent = actualDays + ' 天';
+  $('outTradeDate').textContent = dateString(tradeDate);
+  $('firstSettlement').textContent = fmtDate(firstSettlement);
+  $('finalSettlement').textContent = fmtDate(finalSettlement);
+  $('availableDate').textContent = fmtDate(available);
+  $('withdrawableDate').textContent = fmtDate(withdrawable);
+  $('calcNote').textContent = '此结果为估算。当前只跳过周六、周日，未识别法定节假日；资金可用/可取日须以券商实际结算信息为准。';
+  $('saveRecord').textContent = '保存本次交易记录';
+}
+function setActive(container, selector, chosen) {
+  container.querySelectorAll(selector).forEach(el => el.classList.toggle('active', el === chosen));
+}
+$('dayTags').addEventListener('click', e => {
+  const tag = e.target.closest('[data-days]'); if (!tag) return;
+  $('nominalDays').value = tag.dataset.days; setActive($('dayTags'),'[data-days]',tag);
+});
+document.querySelectorAll('[data-amount]').forEach(tag => tag.addEventListener('click', () => {
+  $('amount').value = tag.dataset.amount;
+  document.querySelectorAll('[data-amount]').forEach(t=>t.classList.toggle('active',t===tag));
+}));
+document.querySelectorAll('[data-rate]').forEach(tag => tag.addEventListener('click', () => {
+  $('annualRate').value = tag.dataset.rate;
+  document.querySelectorAll('[data-rate]').forEach(t=>t.classList.toggle('active',t===tag));
+  $('rateStatus').textContent = '已选择手动参考利率；并非实时行情。';
+}));
+$('nominalDays').addEventListener('input', () => {
+  const match = [...$('dayTags').querySelectorAll('[data-days]')].find(t=>Number(t.dataset.days)===Number($('nominalDays').value));
+  setActive($('dayTags'),'[data-days]',match);
+});
+$('calculateBtn').addEventListener('click', calculate);
+$('saveRecord').addEventListener('click', () => {
+  if (!latestCalculation) return alert('请先完成测算。');
+  const records = readRecords();
+  records.push(latestCalculation);
+  if (writeRecords(records)) { renderRecords(); $('saveRecord').textContent = '已保存（可再次点击保存新记录）'; }
+});
+$('clearRecords').addEventListener('click', () => {
+  if (!readRecords().length) return alert('目前没有记录。');
+  if (confirm('确定清空所有累计记录吗？建议先导出备份。')) {
+    if (writeRecords([])) renderRecords();
+  }
+});
+function downloadFile(name, content, type) {
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+$('exportCsv').addEventListener('click', () => {
+  const records = readRecords();
+  if (!records.length) return alert('暂无记录可导出。');
+  const headers = ['交易日期','期限天数','投资金额','年化利率(%)','计息天数','毛利息','佣金','净收益','首次结算日','到期结算日'];
+  const rows = records.map(r=>[r.tradeDate,r.days,r.amount,r.rate,r.actualDays,r.gross,r.fee,r.net,r.firstSettlement,r.finalSettlement]);
+  const csv = '\uFEFF' + [headers,...rows].map(row=>row.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  downloadFile('国债逆回购记录.csv',csv,'text/csv;charset=utf-8');
+});
+$('backupJson').addEventListener('click', () => {
+  downloadFile('国债逆回购记录备份.json',JSON.stringify(readRecords(),null,2),'application/json;charset=utf-8');
+});
+$('importJson').addEventListener('change', async e => {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data) || data.some(r=>!r || typeof r.id!=='string' || !Number.isFinite(Number(r.net)))) throw new Error('格式不正确');
+    const current = readRecords(), map = new Map(current.map(r=>[r.id,r]));
+    data.forEach(r=>map.set(r.id,r));
+    if (writeRecords([...map.values()])) { renderRecords(); alert(`导入完成，共有 ${map.size} 条记录。`); }
+  } catch(err) { alert('导入失败：文件不是有效的本程序备份。'); }
+  e.target.value = '';
+});
 
-          if (gc001 > 0 || r001 > 0) {
-            gc001 = gc001 || 1.85;
-            r001 = r001 || 1.80;
-            setRate(gc001);
-            container.innerHTML = `
-              <div class="tag rate-tag" onclick="setRate(${gc001.toFixed(3)})">沪GC001: ${gc001.toFixed(3)}%</div>
-              <div class="tag rate-tag" onclick="setRate(${r001.toFixed(3)})">深R-001: ${r001.toFixed(3)}%</div>
-            `;
-            return;
-          }
-        } catch (e) {}
-        setDefaultRates();
-      };
-
-      script.onerror = function() {
-        setDefaultRates();
-      };
-
-      document.body.appendChild(script);
-    }
-
-    function setDefaultRates() {
-      document.getElementById('marketRateTags').innerHTML = `
-        <div class="tag rate-tag" onclick="setRate(1.85)">常规: 1.85%</div>
-        <div class="tag rate-tag" onclick="setRate(2.55)">平均: 2.55%</div>
-        <div class="tag rate-tag" onclick="setRate(3.50)">高峰: 3.50%</div>
-      `;
-    }
-
-    function setRate(rate) {
-      document.getElementById('annualRate').value = rate;
-    }
-
-    function setDays(days, el) {
-      document.getElementById('nominalDays').value = days;
-      document.querySelectorAll('.quick-tags .tag').forEach(t => {
-        if (!t.classList.contains('rate-tag')) t.classList.remove('active');
-      });
-      el.classList.add('active');
-    }
-
-    function isWeekend(date) {
-      const day = date.getDay();
-      return day === 0 || day === 6;
-    }
-
-    function getNextTradingDay(date) {
-      let next = new Date(date);
-      next.setDate(next.getDate() + 1);
-      while (isWeekend(next)) {
-        next.setDate(next.getDate() + 1);
-      }
-      return next;
-    }
-
-    function formatDate(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-
-    function doCalculate() {
-      const tradeDateVal = document.getElementById('tradeDate').value;
-      if (!tradeDateVal) return alert('请选择交易日期');
-
-      const tradeDate = new Date(tradeDateVal + 'T00:00:00');
-      const nominalDays = parseInt(document.getElementById('nominalDays').value) || 1;
-      const amount = parseFloat(document.getElementById('amount').value) || 0;
-      const annualRate = parseFloat(document.getElementById('annualRate').value) || 0;
-      const commissionRate = 0.00001;
-
-      const firstSettlement = getNextTradingDay(tradeDate);
-      let targetDate = new Date(firstSettlement);
-      targetDate.setDate(targetDate.getDate() + nominalDays);
-      const finalSettlement = getNextTradingDay(new Date(targetDate.setDate(targetDate.getDate() - 1)));
-
-      const diffTime = finalSettlement.getTime() - firstSettlement.getTime();
-      const actualDays = Math.max(1, Math.round(diffTime / (1000 * 3600 * 24)));
-
-      const grossInterest = (amount * (annualRate / 100) * actualDays) / 365;
-      const commission = amount * commissionRate;
-      const netIncome = Math.max(0, grossInterest - commission);
-      const actualAnnualRate = amount > 0 ? (netIncome / amount / actualDays) * 365 * 100 : 0;
-
-      document.getElementById('netIncome').innerText = '￥' + netIncome.toFixed(2);
-      document.getElementById('actualRate').innerText = actualAnnualRate.toFixed(3) + '%';
-      document.getElementById('actualDays').innerText = actualDays + ' 天';
-      document.getElementById('feeDetail').innerText = `￥${grossInterest.toFixed(2)} / ￥${commission.toFixed(2)}`;
-      document.getElementById('firstSettlement').innerText = formatDate(firstSettlement);
-      document.getElementById('finalSettlement').innerText = formatDate(finalSettlement);
-      document.getElementById('withdrawableDate').innerText = formatDate(finalSettlement);
-
-      document.getElementById('resultCard').style.display = 'block';
-    }
-  </script>
+// 行情获取采取保守策略：不将未经验证的数据冒充实时行情。
+$('refreshRate').addEventListener('click', () => {
+  $('rateStatus').textContent = '未自动填入行情。请查看券商交易页面的最新报价后手动输入，以避免跨域或接口变化造成误报。';
+  alert('为避免把失效或错位的行情字段当作实时利率，本版本不自动覆盖利率。请以券商交易页面报价为准，再手动输入。');
+});
+$('tradeDate').value = dateString(new Date());
+renderRecords();
+</script>
 </body>
 </html>
