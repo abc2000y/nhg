@@ -68,7 +68,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 5px;b
     </div>
   </div>
   <div class="form-group">
-    <div class="label-row"><label for="annualRate">年化利率（%）</label><button type="button" class="secondary small" id="refreshRate">尝试获取行情 ↻</button></div>
+    <div class="label-row"><label for="annualRate">年化利率（%）</label><button type="button" class="secondary small" id="refreshRate">一键获取全品种行情 ↻</button></div>
     <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.55">
     <div class="quick-tags" id="rateTags">
       <div class="tag active" data-rate="2.55">2.55%</div><div class="tag" data-rate="2">2.00%</div>
@@ -141,18 +141,21 @@ const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'repo_calculator_records_v2';
 let latestCalculation = null;
 
-// 各天数品种对应的证券代码映射表（沪市 / 深市）
+// 全品种代码映射
 const CODE_MAP = {
-  1:   { sh: 'sh201001', sz: 'sz131810', shName: 'GC001', szName: 'R-001' },
-  2:   { sh: 'sh201002', sz: 'sz131811', shName: 'GC002', szName: 'R-002' },
-  3:   { sh: 'sh201003', sz: 'sz131800', shName: 'GC003', szName: 'R-003' },
-  4:   { sh: 'sh201004', sz: 'sz131809', shName: 'GC004', szName: 'R-004' },
-  7:   { sh: 'sh201007', sz: 'sz131801', shName: 'GC007', szName: 'R-007' },
-  14:  { sh: 'sh201014', sz: 'sz131802', shName: 'GC014', szName: 'R-014' },
-  28:  { sh: 'sh201028', sz: 'sz131803', shName: 'GC028', szName: 'R-028' },
-  91:  { sh: 'sh201091', sz: 'sz131805', shName: 'GC091', szName: 'R-091' },
-  182: { sh: 'sh201182', sz: 'sz131806', shName: 'GC182', szName: 'R-182' }
+  1:   { sh: 'sh201001', sz: 'sz131810', name: '1天' },
+  2:   { sh: 'sh201002', sz: 'sz131811', name: '2天' },
+  3:   { sh: 'sh201003', sz: 'sz131800', name: '3天' },
+  4:   { sh: 'sh201004', sz: 'sz131809', name: '4天' },
+  7:   { sh: 'sh201007', sz: 'sz131801', name: '7天' },
+  14:  { sh: 'sh201014', sz: 'sz131802', name: '14天' },
+  28:  { sh: 'sh201028', sz: 'sz131803', name: '28天' },
+  91:  { sh: 'sh201091', sz: 'sz131805', name: '91天' },
+  182: { sh: 'sh201182', sz: 'sz131806', name: '182天' }
 };
+
+// 用于缓存拉取到的所有天数最新利率 { 1: 1.85, 2: 1.90, ... }
+const rateCache = {};
 
 function parseLocalDate(value) {
   if (!value) return null;
@@ -262,10 +265,27 @@ function calculate() {
 function setActive(container, selector, chosen) {
   container.querySelectorAll(selector).forEach(el => el.classList.toggle('active', el === chosen));
 }
+
+// 切换天数时，如果已有缓存，自动把该天数的最新利率填入
 $('dayTags').addEventListener('click', e => {
   const tag = e.target.closest('[data-days]'); if (!tag) return;
-  $('nominalDays').value = tag.dataset.days; setActive($('dayTags'),'[data-days]',tag);
+  const days = Number(tag.dataset.days);
+  $('nominalDays').value = days; 
+  setActive($('dayTags'),'[data-days]',tag);
+
+  if (rateCache[days]) {
+    const rateVal = rateCache[days].toFixed(3);
+    $('annualRate').value = rateVal;
+    const firstRateTag = document.querySelector('[data-rate]');
+    if (firstRateTag) {
+      firstRateTag.dataset.rate = rateVal;
+      firstRateTag.textContent = rateVal + '%';
+      document.querySelectorAll('[data-rate]').forEach(t => t.classList.toggle('active', t === firstRateTag));
+    }
+    $('rateStatus').textContent = `已自动加载 [${days}天期] 行情：${rateVal}%`;
+  }
 });
+
 document.querySelectorAll('[data-amount]').forEach(tag => tag.addEventListener('click', () => {
   $('amount').value = tag.dataset.amount;
   document.querySelectorAll('[data-amount]').forEach(t=>t.classList.toggle('active',t===tag));
@@ -320,59 +340,75 @@ $('importJson').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-// 动态行情获取函数：根据选中的【品种天数】加载对应交易所代码行情
-$('refreshRate').addEventListener('click', () => {
-  const days = parseInt($('nominalDays').value) || 1;
-  const targetCode = CODE_MAP[days] || CODE_MAP[1]; // 若不是标准天数则默认取1天期
+// 一键拉取所有天数（1到182天）全套品种的最新行情
+fetchAllRates();
+$('refreshRate').addEventListener('click', fetchAllRates);
 
-  $('rateStatus').textContent = `正在获取 [${days}天期] 实时盘面...`;
+function fetchAllRates() {
+  $('rateStatus').textContent = '正在获取全品种 (1~182天) 实时盘面...';
+  
+  // 拼装所有代码请求字符串
+  const codes = [];
+  Object.values(CODE_MAP).forEach(item => {
+    codes.push(item.sh, item.sz);
+  });
+
   const oldScript = document.getElementById('market_script');
   if (oldScript) oldScript.remove();
 
   const script = document.createElement('script');
   script.id = 'market_script';
-  // 动态拼装天数对应的沪深两市行情代码
-  script.src = `https://qt.gtimg.cn/q=${targetCode.sz},${targetCode.sh}&_=` + Date.now();
+  script.src = `https://qt.gtimg.cn/q=${codes.join(',')}&_=` + Date.now();
 
   script.onload = function() {
     try {
-      let shRate = 0, szRate = 0;
-      const shVar = `v_${targetCode.sh}`;
-      const szVar = `v_${targetCode.sz}`;
+      let updatedCount = 0;
+      Object.keys(CODE_MAP).forEach(days => {
+        const item = CODE_MAP[days];
+        const shVar = `v_${item.sh}`;
+        const szVar = `v_${item.sz}`;
+        let shRate = 0, szRate = 0;
 
-      if (typeof window[shVar] !== 'undefined' && window[shVar]) {
-        shRate = parseFloat(window[shVar].split('~')[3]) || 0;
-      }
-      if (typeof window[szVar] !== 'undefined' && window[szVar]) {
-        szRate = parseFloat(window[szVar].split('~')[3]) || 0;
-      }
+        if (typeof window[shVar] !== 'undefined' && window[shVar]) {
+          shRate = parseFloat(window[shVar].split('~')[3]) || 0;
+        }
+        if (typeof window[szVar] !== 'undefined' && window[szVar]) {
+          szRate = parseFloat(window[szVar].split('~')[3]) || 0;
+        }
 
-      // 优先取非0有效值（优先沪市，若沪市为0则自动取深市）
-      const validRate = shRate > 0 ? shRate : (szRate > 0 ? szRate : 0);
+        const valid = shRate > 0 ? shRate : (szRate > 0 ? szRate : 0);
+        if (valid > 0) {
+          rateCache[days] = valid;
+          updatedCount++;
 
-      if (validRate > 0) {
-        const rateVal = validRate.toFixed(3);
-        
-        // 1. 填入利率输入框
+          // 核心优化：在天数标签上直接标注最新年化利率
+          const tag = document.querySelector(`[data-days="${days}"]`);
+          if (tag) {
+            tag.textContent = `${days}天(${valid.toFixed(2)}%)`;
+          }
+        }
+      });
+
+      const currentDays = parseInt($('nominalDays').value) || 1;
+      if (rateCache[currentDays]) {
+        const rateVal = rateCache[currentDays].toFixed(3);
         $('annualRate').value = rateVal;
 
-        // 2. 更新最左侧第一个点选框，并激活选中状态
         const firstRateTag = document.querySelector('[data-rate]');
         if (firstRateTag) {
           firstRateTag.dataset.rate = rateVal;
           firstRateTag.textContent = rateVal + '%';
-          
-          document.querySelectorAll('[data-rate]').forEach(t => {
-            t.classList.toggle('active', t === firstRateTag);
-          });
+          document.querySelectorAll('[data-rate]').forEach(t => t.classList.toggle('active', t === firstRateTag));
         }
+      }
 
-        $('rateStatus').textContent = `已更新 [${days}天期] | 沪${targetCode.shName}: ${shRate}%，深${targetCode.szName}: ${szRate}%`;
+      if (updatedCount > 0) {
+        $('rateStatus').textContent = `全品种行情已同步！已获取 ${updatedCount} 个有效品种数据。切换天数可直接使用。`;
       } else {
-        $('rateStatus').textContent = `当前非交易时间（15:30后或周末）或 [${days}天期] 盘面无报价，请手动输入。`;
+        $('rateStatus').textContent = '当前非交易时间（15:30后或周末盘面无报价），请手动输入。';
       }
     } catch(e) {
-      $('rateStatus').textContent = '行情解析失败，请手动输入。';
+      $('rateStatus').textContent = '行情解析异常，请手动输入。';
     }
     if (document.body.contains(script)) script.remove();
   };
@@ -383,7 +419,7 @@ $('refreshRate').addEventListener('click', () => {
   };
 
   document.body.appendChild(script);
-});
+}
 
 $('tradeDate').value = dateString(new Date());
 renderRecords();
