@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <style>
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      touch-action: none; user-select: none;
+      background: radial-gradient(circle at 50% 40%, #10141f 0%, #05060a 70%);
+      font-family: -apple-system, "PingFang SC", sans-serif;
+    }
+    canvas { display: block; }
+
+    /* ===== 开局选择人数 ===== */
+    #startScreen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(5, 8, 15, 0.94);
+      z-index: 100; color: #fff;
+    }
+    #startScreen.hide { display: none; }
+    #startScreen h1 {
+      font-size: 26px; font-weight: bold; letter-spacing: 4px;
+      color: #ffe6a8; text-shadow: 0 0 20px rgba(255,210,120,0.8);
+      margin: 0 0 10px;
+    }
+    #startScreen p {
+      color: #aabbe0; font-size: 14px; margin: 0 0 30px; letter-spacing: 1px;
+    }
+    .playerBtns {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; max-width: 320px;
+    }
+    .playerBtns button {
+      width: 88px; height: 88px;
+      border: 2px solid rgba(220,190,110,0.5);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #2a3a5a, #1a2538);
+      color: #ffe6a8; font-size: 22px; font-weight: bold;
+      cursor: pointer; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .playerBtns button:active {
+      transform: scale(0.94);
+      background: linear-gradient(180deg, #3a4a6a, #2a3550);
+      box-shadow: 0 0 20px rgba(255,210,120,0.5);
+    }
+    .playerBtns button small {
+      display: block; font-size: 11px; color: #aabbe0;
+      font-weight: normal; margin-top: 2px; letter-spacing: 0;
+    }
+
+    #tip {
+      position: fixed; left: 0; right: 0; top: 16px; text-align: center;
+      color: #aabbe0; font-size: 13px; letter-spacing: 1px;
+      pointer-events: none; z-index: 10;
+    }
+    #turn {
+      position: fixed; left: 0; right: 0; top: 40px; text-align: center;
+      color: #ffe6a8; font-size: 22px; font-weight: bold;
+      letter-spacing: 3px;
+      text-shadow: 0 0 16px rgba(255,210,120,0.9);
+      pointer-events: none; z-index: 10;
+      transition: color 0.2s;
+    }
+
+    #scoreboard {
+      position: fixed; right: 12px; top: 50%;
+      transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 8px;
+      z-index: 10; pointer-events: none;
+    }
+    .scoreRow {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: rgba(10,15,30,0.7);
+      border: 1px solid rgba(120,160,220,0.25);
+      border-radius: 8px;
+      color: #cdd9ff; font-size: 13px; letter-spacing: 1px;
+      min-width: 110px; transition: all 0.2s;
+    }
+    .scoreRow.active {
+      box-shadow: 0 0 16px rgba(255,210,120,0.6);
+      background: rgba(40,30,10,0.85);
+      transform: scale(1.08);
+    }
+    .scoreRow .name { font-weight: bold; min-width: 46px; }
+    .scoreRow .pts {
+      margin-left: auto; color: #fff;
+      font-weight: bold; font-size: 15px;
+    }
+
+    #flash {
+      position: fixed; inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(255,50,50,0.6), rgba(180,0,0,0.9));
+      opacity: 0; pointer-events: none; z-index: 20;
+      transition: opacity 0.3s;
+    }
+    #flash.on { opacity: 1; }
+
+    /* ===== 结束提示（层在怪物下面）===== */
+    #gameover {
+      position: fixed; left: 0; right: 0; top: 10%;
+      display: none; flex-direction: column; align-items: center;
+      pointer-events: none; z-index: 30;
+      color: #fff; text-align: center;
+    }
+    #gameover.show { display: flex; }
+    #gameover .big {
+      font-size: 36px; font-weight: bold; letter-spacing: 6px;
+      text-shadow: 0 0 30px rgba(255,0,0,1), 0 0 60px rgba(255,0,0,0.6);
+      animation: shake 0.5s ease-in-out infinite;
+    }
+    #gameover .sub {
+      font-size: 15px; margin-top: 12px;
+      color: #ffbbbb; letter-spacing: 2px;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translate(0,0); }
+      25% { transform: translate(-3px,2px); }
+      50% { transform: translate(2px,-3px); }
+      75% { transform: translate(-2px,-2px); }
+    }
+
+    /* ===== ★ 怪物图层：在最上面（z-index: 50）★ ===== */
+    #monsterOverlay {
+      position: fixed; inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 50;
+    }
+    #monsterOverlay.show { display: flex; }
+
+    .monsterFace {
+      position: relative;
+      width: 220px; height: 220px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #4a2070, #2a1040 60%, #150520);
+      box-shadow:
+        0 0 60px rgba(180, 80, 255, 0.8),
+        0 0 120px rgba(120, 0, 200, 0.6),
+        inset -20px -20px 60px rgba(0,0,0,0.6),
+        inset 20px 20px 40px rgba(150, 80, 220, 0.3);
+      animation: monsterPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+                 monsterFloat 2s ease-in-out infinite 0.6s;
+    }
+
+    @keyframes monsterPop {
+      0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+      60% { transform: scale(1.15) rotate(5deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    @keyframes monsterFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    .monsterFace .eye {
+      position: absolute;
+      top: 60px;
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 20px rgba(255,255,255,0.9);
+    }
+    .monsterFace .eye.left { left: 42px; }
+    .monsterFace .eye.right { right: 42px; }
+
+    .monsterFace .eye::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #000;
+      transform: translate(-50%, -50%);
+      animation: pupilMove 1.2s ease-in-out infinite;
+    }
+    @keyframes pupilMove {
+      0%, 100% { transform: translate(-50%, -50%); }
+      25% { transform: translate(-70%, -50%); }
+      75% { transform: translate(-30%, -50%); }
+    }
+
+    /* 眉 */
+    .monsterFace .brow {
+      position: absolute;
+      top: 44px;
+      width: 50px; height: 8px;
+      background: #1a0a25;
+      border-radius: 4px;
+    }
+    .monsterFace .brow.left { left: 40px; transform: rotate(-15deg); }
+    .monsterFace .brow.right { right: 40px; transform: rotate(15deg); }
+
+    /* 嘴：锯齿 */
+    .monsterFace .mouth {
+      position: absolute;
+      bottom: 50px; left: 50%;
+      transform: translateX(-50%);
+      width: 90px; height: 30px;
+      background: #0a0008;
+      border-radius: 0 0 50% 50% / 0 0 100% 100%;
+      overflow: hidden;
+    }
+    .monsterFace .mouth::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 12px;
+      background: repeating-linear-gradient(
+        90deg,
+        #fff 0 8px, transparent 8px 16px
+      );
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+      /* 牙齿 */
+      -webkit-mask: linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0);
+    }
+    .monsterFace .mouth::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 10px;
+      background: repeating-linear-gradient(
+        90deg,
+        #fff 0 8px, transparent 8px 16px
+      );
+    }
+
+    /* 角 */
+    .monsterFace .horn {
+      position: absolute;
+      top: -30px;
+      width: 0; height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-bottom: 50px solid #1a0a25;
+    }
+    .monsterFace .horn.left {
+      left: 30px;
+      transform: rotate(-25deg);
+    }
+    .monsterFace .horn.right {
+      right: 30px;
+      transform: rotate(25deg);
+    }
+
+    #restartBtn {
+      position: fixed; left: 50%; bottom: 30px;
+      transform: translateX(-50%);
+      padding: 12px 40px; border: none; border-radius: 40px;
+      font-size: 16px; font-weight: bold; letter-spacing: 2px;
+      color: #1a1208; cursor: pointer;
+      background: linear-gradient(180deg, #f5e6a8, #c9a84a 60%, #8a6a30);
+      box-shadow: 0 0 24px rgba(220,190,110,0.45), 0 4px 12px rgba(0,0,0,0.5);
+      display: none; z-index: 60; font-family: inherit;
+    }
+    #restartBtn.show { display: block; }
+    #restartBtn:active { transform: translateX(-50%) scale(0.95); }
+  </style>
+</head>
+<body>
+
+<div id="startScreen">
+  <h1>⚔️ 抽 剑 对 战</h1>
+  <p>18 把剑，藏着 1 只怪物，抽到就输</p>
+  <div class="playerBtns">
+    <button data-n="1">1人<small>VS 电脑</small></button>
+    <button data-n="2">2人<small>本地对战</small></button>
+    <button data-n="3">3人<small>本地对战</small></button>
+    <button data-n="4">4人<small>本地对战</small></button>
+    <button data-n="5">5人<small>本地对战</small></button>
+    <button data-n="6">6人<small>本地对战</small></button>
+  </div>
+</div>
+
+<div id="tip">拖动旋转 · 点击球前面的剑柄抽取</div>
+<div id="turn">请选择人数</div>
+<div id="scoreboard"></div>
+<div id="flash"></div>
+<div id="gameover">
+  <div class="big" id="goTitle">💀 踩到怪物！</div>
+  <div class="sub" id="goSub"></div>
+</div>
+
+<!-- ★ 怪物图层：在蒙板之上 ★ -->
+<div id="monsterOverlay">
+  <div class="monsterFace">
+    <div class="horn left"></div>
+    <div class="horn right"></div>
+    <div class="brow left"></div>
+    <div class="brow right"></div>
+    <div class="eye left"></div>
+    <div class="eye right"></div>
+    <div class="mouth"></div>
+  </div>
+</div>
+
+<button id="restartBtn">再 来 一 局</button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ================= 游戏状态 =================
+let playerCount = 0;
+let isVSComputer = false;
+let currentPlayer = 0;
+let scores = [];
+let playerNames = [];
+let gameOver = false;
+let totalDrawn = 0;
+let computerThinking = false;
+
+const startScreenEl = document.getElementById('startScreen');
+const tipEl = document.getElementById('tip');
+const turnEl = document.getElementById('turn');
+const scoreboardEl = document.getElementById('scoreboard');
+const flashEl = document.getElementById('flash');
+const gameoverEl = document.getElementById('gameover');
+const goTitleEl = document.getElementById('goTitle');
+const goSubEl = document.getElementById('goSub');
+const restartBtn = document.getElementById('restartBtn');
+const monsterOverlayEl = document.getElementById('monsterOverlay');
+
+const PLAYER_COLORS = [
+  '#ffd966', '#88d8ff', '#ff88b8', '#a8ff88', '#d888ff', '#ffb060',
+];
+
+// ================= Three.js =================
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 0, 8);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.3;
+document.body.appendChild(renderer.domElement);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+function makeEnvTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#c0d8f8');
+  grad.addColorStop(0.5, '#4a5a7a');
+  grad.addColorStop(1, '#0a0a12');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 512, 256);
+  g.fillStyle = 'rgba(255,255,255,1)';
+  g.beginPath(); g.arc(100, 60, 50, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(220,240,255,0.8)';
+  g.beginPath(); g.arc(400, 40, 60, 0, Math.PI * 2); g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const envTex = makeEnvTexture();
+const envMap = pmremGenerator.fromEquirectangular(envTex).texture;
+scene.environment = envMap;
+
+scene.add(new THREE.AmbientLight(0x8899bb, 1.5));
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+keyLight.position.set(-5, 6, 6);
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x99bbff, 1.4);
+fillLight.position.set(5, -2, -4);
+scene.add(fillLight);
+const rimLight = new THREE.PointLight(0xffcc66, 1.5, 20);
+rimLight.position.set(0, -5, 3);
+scene.add(rimLight);
+const frontLight = new THREE.PointLight(0xffeecc, 2.0, 25);
+frontLight.position.set(0, 0, 6);
+scene.add(frontLight);
+
+const SPHERE_R = 2.2;
+const sphereGeo = new THREE.SphereGeometry(SPHERE_R, 64, 48);
+const sphereMat = new THREE.MeshStandardMaterial({
+  color: 0x2a4a8a, metalness: 0.9, roughness: 0.28,
+  emissive: 0x0a1530, emissiveIntensity: 0.4, envMapIntensity: 1.2,
+});
+const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+scene.add(sphere);
+
+// ================= 工厂 =================
+function makeNumberSprite(num) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.font = 'bold 84px -apple-system, "PingFang SC", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 12;
+  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+  ctx.strokeText(String(num), 64, 68);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(String(num), 64, 68);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthTest: true, depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.22, 0.22, 1);
+  sprite.raycast = () => {};
+  return sprite;
+}
+
+function makeBladeTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 1024;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 256, 0);
+  grad.addColorStop(0, '#9098a8');
+  grad.addColorStop(0.5, '#ffffff');
+  grad.addColorStop(1, '#9098a8');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 1024);
+  g.strokeStyle = 'rgba(255,255,255,1)';
+  g.lineWidth = 5;
+  g.beginPath(); g.moveTo(128, 0); g.lineTo(128, 1024); g.stroke();
+  g.strokeStyle = 'rgba(120,120,150,0.45)';
+  g.lineWidth = 3; g.lineCap = 'round';
+  for (let i = 0; i < 12; i++) {
+    const y = 120 + i * 70;
+    g.beginPath(); g.moveTo(128, y); g.bezierCurveTo(80, y-20, 40, y+30, 30, y-10); g.stroke();
+    g.beginPath(); g.moveTo(30, y-10); g.bezierCurveTo(50, y-30, 70, y-20, 80, y-40); g.stroke();
+    g.beginPath(); g.moveTo(128, y); g.bezierCurveTo(176, y-20, 216, y+30, 226, y-10); g.stroke();
+    g.beginPath(); g.moveTo(226, y-10); g.bezierCurveTo(206, y-30, 186, y-20, 176, y-40); g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const bladeTexture = makeBladeTexture();
+
+function makeGuardGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, -0.02);
+  shape.bezierCurveTo(-0.06,-0.06, -0.09,-0.12, -0.06,-0.16);
+  shape.bezierCurveTo(-0.04,-0.18, -0.02,-0.15, -0.03,-0.11);
+  shape.bezierCurveTo(-0.08,-0.09, -0.12,-0.06, -0.10,-0.02);
+  shape.lineTo(-0.04, 0.02);
+  shape.lineTo(0, 0.03);
+  shape.lineTo(0.04, 0.02);
+  shape.lineTo(0.10, -0.02);
+  shape.bezierCurveTo(0.12,-0.06, 0.08,-0.09, 0.03,-0.11);
+  shape.bezierCurveTo(0.02,-0.15, 0.04,-0.18, 0.06,-0.16);
+  shape.bezierCurveTo(0.09,-0.12, 0.06,-0.06, 0,-0.02);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.035, bevelEnabled: true, bevelThickness: 0.005, bevelSize: 0.004, bevelSegments: 2,
+  });
+  geo.center();
+  return geo;
+}
+const guardGeo = makeGuardGeometry();
+
+function makeSword(num) {
+  const g = new THREE.Group();
+  const bladeMat = new THREE.MeshStandardMaterial({
+    map: bladeTexture, color: 0xffffff, metalness: 0.75, roughness: 0.15,
+    envMapIntensity: 2.5, emissive: 0x4a4a5a, emissiveIntensity: 0.8,
+    transparent: true, opacity: 1,
+  });
+  const darkMetalMat = new THREE.MeshStandardMaterial({
+    color: 0x5a5550, metalness: 1.0, roughness: 0.32, envMapIntensity: 2.0,
+    emissive: 0x202020, emissiveIntensity: 0.5, transparent: true, opacity: 1,
+  });
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xd4a64a, metalness: 1.0, roughness: 0.25, envMapIntensity: 2.5,
+    emissive: 0x5a3a18, emissiveIntensity: 0.7, transparent: true, opacity: 1,
+  });
+  const gemMat = new THREE.MeshStandardMaterial({
+    color: 0xee0035, metalness: 0.3, roughness: 0.05,
+    emissive: 0xaa0035, emissiveIntensity: 2.5, transparent: true, opacity: 1,
+  });
+  const wrapMat = new THREE.MeshStandardMaterial({
+    color: 0x9a2828, metalness: 0.4, roughness: 0.6,
+    emissive: 0x5a1018, emissiveIntensity: 0.8, envMapIntensity: 1.5,
+    transparent: true, opacity: 1,
+  });
+
+  const bladeLen = 0.72;
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.018, bladeLen), bladeMat);
+  blade.position.z = bladeLen / 2;
+  g.add(blade);
+
+  const edgeMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, metalness: 0.8, roughness: 0.08, envMapIntensity: 3.0,
+    emissive: 0x666677, emissiveIntensity: 0.6, transparent: true, opacity: 1,
+  });
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.008, bladeLen * 0.98), edgeMat);
+  edge.position.z = bladeLen / 2;
+  g.add(edge);
+
+  const guard = new THREE.Mesh(guardGeo, darkMetalMat);
+  guard.rotation.x = Math.PI / 2;
+  guard.scale.set(1.4, 1.4, 1.0);
+  g.add(guard);
+
+  const gem = new THREE.Mesh(new THREE.SphereGeometry(0.028, 16, 12), gemMat);
+  gem.position.z = -0.02; gem.scale.set(1, 0.7, 0.6);
+  g.add(gem);
+
+  const gemRing = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.006, 8, 20), goldMat);
+  gemRing.position.z = -0.02;
+  g.add(gemRing);
+
+  const handleLen = 0.18;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, handleLen, 10), wrapMat);
+  handle.rotation.x = Math.PI / 2;
+  handle.position.z = -0.04 - handleLen / 2;
+  g.add(handle);
+
+  for (let i = 0; i < 4; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.005, 8, 16), goldMat);
+    ring.position.z = -0.06 - i * 0.045;
+    g.add(ring);
+  }
+
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.032, 14, 10), goldMat);
+  pommel.position.z = -0.04 - handleLen - 0.04;
+  g.add(pommel);
+
+  const pomGem = new THREE.Mesh(new THREE.SphereGeometry(0.015, 10, 8), gemMat);
+  pomGem.position.z = -0.04 - handleLen - 0.075;
+  g.add(pomGem);
+
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 10), goldMat);
+  collar.rotation.x = Math.PI / 2;
+  collar.position.z = -0.03;
+  g.add(collar);
+
+  const numSprite = makeNumberSprite(num);
+  numSprite.position.set(0, 0, -0.32);
+  g.add(numSprite);
+
+  g.userData.materials = [bladeMat, edgeMat, darkMetalMat, goldMat, gemMat, wrapMat];
+  g.userData.sprite = numSprite;
+  return g;
+}
+
+// ================= 建剑 =================
+const SWORD_SCALE = 1.35;
+const SWORD_COUNT = 18;
+const INSERT_AT = -0.2;
+const golden = Math.PI * (3 - Math.sqrt(5));
+
+let swords = [];
+let monsterIndex = -1;
+
+function buildSwords() {
+  for (const s of swords) {
+    if (s.mesh.parent) s.mesh.parent.remove(s.mesh);
+  }
+  swords = [];
+  monsterIndex = Math.floor(Math.random() * SWORD_COUNT);
+
+  for (let i = 0; i < SWORD_COUNT; i++) {
+    const t = (i + 0.5) / SWORD_COUNT;
+    const y = 1 - t * 2;
+    const phi = Math.acos(Math.max(-1, Math.min(1, y * 0.9)));
+    const theta = golden * i;
+
+    const sp = Math.sin(phi);
+    const dir = new THREE.Vector3(sp * Math.cos(theta), Math.cos(phi), sp * Math.sin(theta));
+    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+
+    const sword = makeSword(i + 1);
+    sword.scale.setScalar(SWORD_SCALE);
+    sword.userData.baseScale = SWORD_SCALE;
+
+    const pos = dir.clone().multiplyScalar(SPHERE_R - INSERT_AT * SWORD_SCALE);
+    sword.position.copy(pos);
+    sword.quaternion.copy(quat);
+    sphere.add(sword);
+
+    swords.push({
+      id: i, mesh: sword, dir: dir.clone(), localPos: pos.clone(),
+      baseScale: SWORD_SCALE, state: 'in', animT: 0, slotPos: new THREE.Vector3(),
+      isMonster: i === monsterIndex,
+    });
+  }
+}
+buildSwords();
+
+const HORIZONTAL_QUAT = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0));
+
+// ================= 拖动 =================
+let rotY = 0;
+let velY = 0.004;
+let dragging = false;
+let lastX = 0;
+let downX = 0, downY = 0, downTime = 0;
+
+function onDown(x, y) {
+  dragging = true;
+  lastX = x;
+  downX = x; downY = y;
+  downTime = performance.now();
+}
+function onMove(x) {
+  if (!dragging) return;
+  velY = (x - lastX) * 0.004;
+  lastX = x;
+}
+
+renderer.domElement.addEventListener('touchstart', e => {
+  onDown(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', e => {
+  onMove(e.touches[0].clientX);
+}, { passive: true });
+renderer.domElement.addEventListener('touchend', e => {
+  const dt = performance.now() - downTime;
+  const dist = Math.hypot(lastX - downX, 0);
+  if (dt < 400 && dist < 15) handleClick(lastX, downY);
+  dragging = false;
+});
+renderer.domElement.addEventListener('mousedown', e => onDown(e.clientX, e.clientY));
+addEventListener('mousemove', e => { if (dragging) onMove(e.clientX); });
+addEventListener('mouseup', e => {
+  if (dragging) {
+    const dt = performance.now() - downTime;
+    const dist = Math.abs(e.clientX - downX);
+    if (dt < 400 && dist < 15) handleClick(e.clientX, e.clientY);
+  }
+  dragging = false;
+});
+
+// ================= 点击 =================
+function handleClick(clientX, clientY) {
+  if (gameOver || playerCount === 0) return;
+  if (isVSComputer && currentPlayer === 1) return;
+  if (computerThinking) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  const clickX = clientX - rect.left;
+  const clickY = clientY - rect.top;
+  const RADIUS = Math.min(rect.width, rect.height) * 0.15;
+
+  let best = null;
+  let bestDist = Infinity;
+
+  sphere.updateMatrixWorld(true);
+
+  for (const s of swords) {
+    if (s.state !== 'in') continue;
+    const worldDir = s.dir.clone().applyQuaternion(sphere.quaternion).normalize();
+    if (worldDir.z < 0.1) continue;
+
+    const handleLocal = new THREE.Vector3(0, 0, -0.32);
+    const handleWorld = handleLocal.clone().applyMatrix4(s.mesh.matrixWorld);
+    const proj = handleWorld.clone().project(camera);
+
+    const sx = (proj.x * 0.5 + 0.5) * rect.width;
+    const sy = (-proj.y * 0.5 + 0.5) * rect.height;
+    const d = Math.hypot(sx - clickX, sy - clickY);
+
+    if (d < RADIUS && d < bestDist) {
+      bestDist = d;
+      best = s;
+    }
+  }
+
+  if (best) pullSword(best, currentPlayer);
+  else tipEl.textContent = '点剑柄（或附近）来抽取';
+}
+
+// ================= 抽剑 =================
+function pullSword(chosen, playerIdx) {
+  chosen.state = 'pull';
+  chosen.animT = 0;
+  chosen.slotPos.copy(getSlotPosition(totalDrawn));
+  chosen.owner = playerIdx;
+
+  if (chosen.mesh.userData.sprite) chosen.mesh.userData.sprite.visible = false;
+
+  totalDrawn++;
+
+  const who = playerNames[playerIdx];
+
+  if (chosen.isMonster) {
+    tipEl.textContent = `💀 第 ${chosen.id + 1} 号是怪物！`;
+    triggerMonster(chosen, playerIdx);
+  } else {
+    scores[playerIdx]++;
+    updateScoreboard();
+    tipEl.textContent = `${who} 抽到第 ${chosen.id + 1} 号宝剑！+1 分`;
+    nextPlayer();
+  }
+}
+
+function nextPlayer() {
+  currentPlayer = (currentPlayer + 1) % playerCount;
+  updateTurnUI();
+
+  if (isVSComputer && currentPlayer === 1 && !gameOver) {
+    computerThinking = true;
+    turnEl.textContent = '▶ 电脑思考中…';
+
+    setTimeout(() => {
+      computerThinking = false;
+      if (gameOver) return;
+      computerPickSword();
+    }, 900);
+  }
+}
+
+function computerPickSword() {
+  const avail = swords.filter(s => s.state === 'in');
+  if (avail.length === 0) { gameOver = true; return; }
+  const chosen = avail[Math.floor(Math.random() * avail.length)];
+  pullSword(chosen, 1);
+}
+
+function triggerMonster(chosen, playerIdx) {
+  gameOver = true;
+  flashEl.classList.add('on');
+  chosen.isBecomingMonster = true;
+
+  const who = playerNames[playerIdx];
+  goTitleEl.textContent = '💀 踩到怪物！';
+  goSubEl.textContent = `${who} 抽到了怪物，输啦！`;
+}
+
+function getSlotPosition(index) {
+  const col = index % 2;
+  const row = Math.floor(index / 2);
+  const viewH = 2 * 8 * Math.tan(22.5 * Math.PI / 180);
+  const viewW = viewH * camera.aspect;
+  const colX = col === 0 ? -viewW * 0.36 : viewW * 0.36;
+  const gapY = 0.72;
+  const startY = viewH * 0.4;
+  const y = startY - row * gapY;
+  return new THREE.Vector3(colX, y, 0);
+}
+
+function setSwordOpacity(sword, op) {
+  for (const m of sword.userData.materials) m.opacity = op;
+}
+
+// ================= UI =================
+function updateTurnUI() {
+  if (playerCount === 0) {
+    turnEl.textContent = '请选择人数';
+    return;
+  }
+  const name = playerNames[currentPlayer];
+  turnEl.textContent = `▶ ${name} 的回合`;
+  turnEl.style.color = PLAYER_COLORS[currentPlayer];
+  turnEl.style.textShadow = `0 0 16px ${PLAYER_COLORS[currentPlayer]}cc`;
+
+  const rows = scoreboardEl.children;
+  for (let i = 0; i < rows.length; i++) {
+    rows[i].classList.toggle('active', i === currentPlayer);
+  }
+}
+
+function updateScoreboard() {
+  scoreboardEl.innerHTML = '';
+  for (let i = 0; i < playerCount; i++) {
+    const row = document.createElement('div');
+    row.className = 'scoreRow';
+    if (i === currentPlayer) row.classList.add('active');
+    row.style.borderColor = PLAYER_COLORS[i];
+
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = playerNames[i];
+    name.style.color = PLAYER_COLORS[i];
+    row.appendChild(name);
+
+    const pts = document.createElement('span');
+    pts.className = 'pts';
+    pts.textContent = scores[i];
+    row.appendChild(pts);
+
+    scoreboardEl.appendChild(row);
+  }
+}
+
+// ================= 开始 / 重开 =================
+document.querySelectorAll('.playerBtns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const n = parseInt(btn.dataset.n);
+    startGame(n);
+  });
+});
+
+function startGame(n) {
+  isVSComputer = (n === 1);
+  playerCount = isVSComputer ? 2 : n;
+
+  currentPlayer = 0;
+  scores = new Array(playerCount).fill(0);
+  gameOver = false;
+  totalDrawn = 0;
+  computerThinking = false;
+
+  playerNames = [];
+  if (isVSComputer) {
+    playerNames = ['你', '电脑'];
+  } else {
+    for (let i = 0; i < n; i++) playerNames.push(`玩家${i + 1}`);
+  }
+
+  buildSwords();
+  rotY = 0;
+  velY = 0.004;
+
+  startScreenEl.classList.add('hide');
+  flashEl.classList.remove('on');
+  gameoverEl.classList.remove('show');
+  restartBtn.classList.remove('show');
+  monsterOverlayEl.classList.remove('show');   // ★ 隐藏怪物
+
+  updateScoreboard();
+  updateTurnUI();
+}
+
+restartBtn.addEventListener('click', () => {
+  startScreenEl.classList.remove('hide');
+  gameoverEl.classList.remove('show');
+  restartBtn.classList.remove('show');
+  flashEl.classList.remove('on');
+  monsterOverlayEl.classList.remove('show');   // ★ 隐藏怪物
+  scoreboardEl.innerHTML = '';
+  turnEl.textContent = '请选择人数';
+  turnEl.style.color = '#ffe6a8';
+  turnEl.style.textShadow = '0 0 16px rgba(255,210,120,0.9)';
+  buildSwords();
+  gameOver = false;
+  computerThinking = false;
+});
+
+// ================= 主循环 =================
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+
+  if (!dragging && !gameOver) {
+    velY *= 0.97;
+    if (Math.abs(velY) < 0.003) velY += (0.004 - velY) * 0.05;
+  } else if (gameOver) {
+    velY *= 0.9;
+  }
+  rotY += velY * dt * 60;
+  sphere.rotation.y = rotY;
+  sphere.updateMatrixWorld(true);
+
+  for (const s of swords) {
+    const m = s.mesh;
+
+    if (s.state === 'pull') {
+      s.animT += dt * 2.5;
+      const t = Math.min(s.animT, 1);
+      const out = t * 1.2;
+      m.position.copy(s.localPos.clone().add(s.dir.clone().multiplyScalar(out)));
+      if (s.animT >= 1) { s.state = 'hold'; s.animT = 0; }
+    }
+    else if (s.state === 'hold') {
+      s.animT += dt * 2.0;
+      const glow = Math.min(s.animT, 1);
+      for (const mat of m.userData.materials) {
+        if (mat.emissive) mat.emissiveIntensity = 0.1 + glow * 0.6;
+      }
+      if (s.animT >= 1) {
+        s.state = 'vanish';
+        s.animT = 0;
+        if (s.isMonster) showMonsterOverlay();   // ★ 直接显示怪物图层
+      }
+    }
+    else if (s.state === 'vanish') {
+      s.animT += dt * 3.3;
+      const t = Math.min(s.animT, 1);
+      m.scale.setScalar(s.baseScale * (1 - t * 0.7));
+      setSwordOpacity(m, 1 - t);
+
+      if (s.animT >= 1) {
+        if (m.parent !== scene) scene.add(m);
+        m.position.copy(s.slotPos);
+        m.quaternion.copy(HORIZONTAL_QUAT);
+        m.scale.setScalar(0.001);
+        setSwordOpacity(m, 0);
+
+        if (s.isMonster) {
+          m.visible = false;
+          s.state = 'out';
+          return;
+        }
+        s.state = 'appear';
+        s.animT = 0;
+      }
+    }
+    else if (s.state === 'appear') {
+      s.animT += dt * 2.5;
+      const t = Math.min(s.animT, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      m.scale.setScalar(s.baseScale * (0.3 + ease * 0.7));
+      setSwordOpacity(m, ease);
+      if (s.animT >= 1) {
+        m.scale.setScalar(s.baseScale);
+        setSwordOpacity(m, 1);
+        s.state = 'out';
+      }
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ★★★ 显示怪物图层（在最上面）★★★
+function showMonsterOverlay() {
+  monsterOverlayEl.classList.add('show');
+
+  setTimeout(() => {
+    gameoverEl.classList.add('show');
+    restartBtn.classList.add('show');
+  }, 500);
+}
+
+animate();
+</script>
+</body>
+</html>
