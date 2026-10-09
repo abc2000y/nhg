@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>国债逆回购计算器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background-color: #f6f8fa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; color: #1f2329; }
+    .header { text-align: center; margin-bottom: 20px; margin-top: 10px; }
+    .title { font-size: 22px; font-weight: bold; }
+    .subtitle { font-size: 13px; color: #8f959e; margin-top: 4px; }
+    .card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .form-group { margin-bottom: 16px; }
+    .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .label { font-size: 14px; color: #1f2329; font-weight: 500; }
+    .ref-link { font-size: 12px; color: #3370ff; cursor: pointer; }
+    .input-box { width: 100%; height: 44px; padding: 0 12px; font-size: 15px; border: 1px solid #dee0e3; border-radius: 10px; outline: none; }
+    .quick-tags { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .tag { flex: 1; min-width: 60px; text-align: center; padding: 8px 0; background: #f2f3f5; border-radius: 8px; font-size: 13px; color: #4e5969; cursor: pointer; }
+    .tag.active { background: #e8f3ff; color: #3370ff; font-weight: bold; border: 1px solid #3370ff; }
+    .rate-tag { background: #fff7e8; color: #ff7d00; border: 1px solid #ffe4ba; }
+    .btn-submit { width: 100%; height: 46px; background: linear-gradient(135deg, #3370ff 0%, #2e62e6 100%); color: #fff; border: none; border-radius: 23px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+    
+    .stats-grid { display: flex; gap: 12px; margin: 16px 0; }
+    .stat-box { flex: 1; background: #f8f9fa; border-radius: 12px; padding: 12px; text-align: center; }
+    .stat-box.primary { background: #fff0f0; }
+    .stat-label { font-size: 12px; color: #8f959e; }
+    .stat-num { font-size: 20px; font-weight: bold; margin-top: 4px; }
+    .red { color: #f53f3f; }
+    .green { color: #00b42a; }
+    .detail-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; }
+    .divider { height: 1px; background: #eff0f1; margin: 8px 0; }
+    .highlight-date { color: #ff7d00; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title">国债逆回购收益测算</div>
+    <div class="subtitle">随身单机版 · 支持行情自动拉取</div>
+  </div>
+
+  <div class="card">
+    <div class="form-group">
+      <label class="label">交易日期</label>
+      <input type="date" id="tradeDate" class="input-box">
+    </div>
+
+    <div class="form-group">
+      <label class="label">品种天数 (天)</label>
+      <input type="number" id="nominalDays" class="input-box" value="1">
+      <div class="quick-tags">
+        <div class="tag active" onclick="setDays(1, this)">1天</div>
+        <div class="tag" onclick="setDays(2, this)">2天</div>
+        <div class="tag" onclick="setDays(3, this)">3天</div>
+        <div class="tag" onclick="setDays(7, this)">7天</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="label">投资金额 (元)</label>
+      <input type="number" id="amount" class="input-box" value="100000">
+    </div>
+
+    <div class="form-group">
+      <div class="label-row">
+        <label class="label">盘面年化 (%)</label>
+        <span class="ref-link" onclick="fetchRatesFromClient()">刷新行情 ↻</span>
+      </div>
+      <input type="number" step="0.01" id="annualRate" class="input-box" value="2.55">
+      <div class="quick-tags" id="marketRateTags">
+        <div class="tag rate-tag" onclick="setRate(1.85)">常规: 1.85%</div>
+        <div class="tag rate-tag" onclick="setRate(2.55)">平均: 2.55%</div>
+        <div class="tag rate-tag" onclick="setRate(3.50)">高峰: 3.50%</div>
+      </div>
+    </div>
+
+    <button class="btn-submit" onclick="doCalculate()">开始测算</button>
+  </div>
+
+  <div class="card" id="resultCard" style="display: none;">
+    <div style="font-size: 16px; font-weight: bold;">测算结果汇总</div>
+    <div class="stats-grid">
+      <div class="stat-box primary">
+        <span class="stat-label">预计净收益</span>
+        <div class="stat-num red" id="netIncome">￥0.00</div>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">实际有效年化</span>
+        <div class="stat-num green" id="actualRate">0.00%</div>
+      </div>
+    </div>
+
+    <div class="detail-item">
+      <span style="color: #8f959e;">实际计息天数</span>
+      <span id="actualDays" style="font-weight: bold; color: #3370ff;">0 天</span>
+    </div>
+    <div class="detail-item">
+      <span style="color: #8f959e;">理论利息 / 佣金</span>
+      <span id="feeDetail">￥0 / ￥0</span>
+    </div>
+    <div class="divider"></div>
+    <div class="detail-item">
+      <span style="color: #8f959e;">首次结算日 (T+1)</span>
+      <span id="firstSettlement">-</span>
+    </div>
+    <div class="detail-item">
+      <span style="color: #8f959e;">到期清算日</span>
+      <span id="finalSettlement">-</span>
+    </div>
+    <div class="detail-item">
+      <span style="color: #8f959e;">资金可用/可取日</span>
+      <span id="withdrawableDate" class="highlight-date">-</span>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('tradeDate').valueAsDate = new Date();
+
+    window.onload = function() {
+      fetchRatesFromClient();
+    };
+
+    function fetchRatesFromClient() {
+      const script = document.createElement('script');
+      script.src = 'https://qt.gtimg.cn/q=sz131810,sh201001';
+      document.body.appendChild(script);
+
+      script.onload = function() {
+        try {
+          if (typeof v_sh201001 !== 'undefined') {
+            const shData = v_sh201001.split('~');
+            const szData = v_sz131810.split('~');
+            const gc001 = parseFloat(shData[3]) || parseFloat(shData[4]) || 1.85;
+            const r001 = parseFloat(szData[3]) || parseFloat(szData[4]) || 1.80;
+
+            setRate(gc001);
+
+            document.getElementById('marketRateTags').innerHTML = `
+              <div class="tag rate-tag" onclick="setRate(${gc001.toFixed(3)})">沪GC001: ${gc001.toFixed(3)}%</div>
+              <div class="tag rate-tag" onclick="setRate(${r001.toFixed(3)})">深R-001: ${r001.toFixed(3)}%</div>
+            `;
+          }
+        } catch(e) {}
+        document.body.removeChild(script);
+      };
+
+      script.onerror = function() {
+        if (document.body.contains(script)) document.body.removeChild(script);
+      };
+    }
+
+    function setRate(rate) {
+      document.getElementById('annualRate').value = rate;
+    }
+
+    function setDays(days, el) {
+      document.getElementById('nominalDays').value = days;
+      document.querySelectorAll('.quick-tags .tag').forEach(t => {
+        if (!t.classList.contains('rate-tag')) t.classList.remove('active');
+      });
+      el.classList.add('active');
+    }
+
+    function isWeekend(date) {
+      const day = date.getDay();
+      return day === 0 || day === 6;
+    }
+
+    function getNextTradingDay(date) {
+      let next = new Date(date);
+      next.setDate(next.getDate() + 1);
+      while (isWeekend(next)) {
+        next.setDate(next.getDate() + 1);
+      }
+      return next;
+    }
+
+    function formatDate(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function doCalculate() {
+      const tradeDateVal = document.getElementById('tradeDate').value;
+      if (!tradeDateVal) return alert('请选择交易日期');
+
+      const tradeDate = new Date(tradeDateVal + 'T00:00:00');
+      const nominalDays = parseInt(document.getElementById('nominalDays').value) || 1;
+      const amount = parseFloat(document.getElementById('amount').value) || 0;
+      const annualRate = parseFloat(document.getElementById('annualRate').value) || 0;
+      const commissionRate = 0.00001;
+
+      const firstSettlement = getNextTradingDay(tradeDate);
+      let targetDate = new Date(firstSettlement);
+      targetDate.setDate(targetDate.getDate() + nominalDays);
+      const finalSettlement = getNextTradingDay(new Date(targetDate.setDate(targetDate.getDate() - 1)));
+
+      const diffTime = finalSettlement.getTime() - firstSettlement.getTime();
+      const actualDays = Math.max(1, Math.round(diffTime / (1000 * 3600 * 24)));
+
+      const grossInterest = (amount * (annualRate / 100) * actualDays) / 365;
+      const commission = amount * commissionRate;
+      const netIncome = Math.max(0, grossInterest - commission);
+      const actualAnnualRate = amount > 0 ? (netIncome / amount / actualDays) * 365 * 100 : 0;
+
+      document.getElementById('netIncome').innerText = '￥' + netIncome.toFixed(2);
+      document.getElementById('actualRate').innerText = actualAnnualRate.toFixed(3) + '%';
+      document.getElementById('actualDays').innerText = actualDays + ' 天';
+      document.getElementById('feeDetail').innerText = `￥${grossInterest.toFixed(2)} / ￥${commission.toFixed(2)}`;
+      document.getElementById('firstSettlement').innerText = formatDate(firstSettlement);
+      document.getElementById('finalSettlement').innerText = formatDate(finalSettlement);
+      document.getElementById('withdrawableDate').innerText = formatDate(finalSettlement);
+
+      document.getElementById('resultCard').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
