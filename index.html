@@ -70,15 +70,14 @@
       </div>
       <input type="number" step="0.01" id="annualRate" class="input-box" value="2.55">
       <div class="quick-tags" id="marketRateTags">
-        <div class="tag rate-tag" onclick="setRate(1.85)">常规: 1.85%</div>
-        <div class="tag rate-tag" onclick="setRate(2.55)">平均: 2.55%</div>
-        <div class="tag rate-tag" onclick="setRate(3.50)">高峰: 3.50%</div>
+        <div class="tag rate-tag">正在获取实时盘面...</div>
       </div>
     </div>
 
     <button class="btn-submit" onclick="doCalculate()">开始测算</button>
   </div>
 
+  <!-- 结果卡片 -->
   <div class="card" id="resultCard" style="display: none;">
     <div style="font-size: 16px; font-weight: bold;">测算结果汇总</div>
     <div class="stats-grid">
@@ -122,11 +121,55 @@
       fetchRatesFromClient();
     };
 
+    // 支持 HTTPS 的行情获取机制（新浪 API 优先，腾讯 API 备用）
     function fetchRatesFromClient() {
+      const container = document.getElementById('marketRateTags');
+      container.innerHTML = '<div class="tag rate-tag">正在获取实时盘面...</div>';
+
+      const script = document.createElement('script');
+      script.src = 'https://hq.sinajs.cn/list=sh201001,sz131810';
+      
+      script.onload = function() {
+        try {
+          let gc001 = 0, r001 = 0;
+          if (typeof hq_str_sh201001 !== 'undefined' && hq_str_sh201001) {
+            const fields = hq_str_sh201001.split(',');
+            gc001 = parseFloat(fields[3]) || parseFloat(fields[2]) || 0;
+          }
+          if (typeof hq_str_sz131810 !== 'undefined' && hq_str_sz131810) {
+            const fields = hq_str_sz131810.split(',');
+            r001 = parseFloat(fields[3]) || parseFloat(fields[2]) || 0;
+          }
+
+          if (gc001 > 0 || r001 > 0) {
+            gc001 = gc001 || 1.85;
+            r001 = r001 || 1.80;
+            setRate(gc001);
+            container.innerHTML = `
+              <div class="tag rate-tag" onclick="setRate(${gc001.toFixed(3)})">沪GC001: ${gc001.toFixed(3)}%</div>
+              <div class="tag rate-tag" onclick="setRate(${r001.toFixed(3)})">深R-001: ${r001.toFixed(3)}%</div>
+            `;
+            if (document.body.contains(script)) document.body.removeChild(script);
+            return;
+          }
+        } catch(e) {}
+        if (document.body.contains(script)) document.body.removeChild(script);
+        fetchRatesFallback();
+      };
+
+      script.onerror = function() {
+        if (document.body.contains(script)) document.body.removeChild(script);
+        fetchRatesFallback();
+      };
+
+      document.body.appendChild(script);
+    }
+
+    // 备用通道：腾讯接口
+    function fetchRatesFallback() {
       const script = document.createElement('script');
       script.src = 'https://qt.gtimg.cn/q=sz131810,sh201001';
-      document.body.appendChild(script);
-
+      
       script.onload = function() {
         try {
           if (typeof v_sh201001 !== 'undefined') {
@@ -134,21 +177,34 @@
             const szData = v_sz131810.split('~');
             const gc001 = parseFloat(shData[3]) || parseFloat(shData[4]) || 1.85;
             const r001 = parseFloat(szData[3]) || parseFloat(szData[4]) || 1.80;
-
             setRate(gc001);
-
             document.getElementById('marketRateTags').innerHTML = `
               <div class="tag rate-tag" onclick="setRate(${gc001.toFixed(3)})">沪GC001: ${gc001.toFixed(3)}%</div>
               <div class="tag rate-tag" onclick="setRate(${r001.toFixed(3)})">深R-001: ${r001.toFixed(3)}%</div>
             `;
+          } else {
+            setDefaultRates();
           }
-        } catch(e) {}
-        document.body.removeChild(script);
-      };
-
-      script.onerror = function() {
+        } catch(e) {
+          setDefaultRates();
+        }
         if (document.body.contains(script)) document.body.removeChild(script);
       };
+      
+      script.onerror = function() {
+        if (document.body.contains(script)) document.body.removeChild(script);
+        setDefaultRates();
+      };
+
+      document.body.appendChild(script);
+    }
+
+    function setDefaultRates() {
+      document.getElementById('marketRateTags').innerHTML = `
+        <div class="tag rate-tag" onclick="setRate(1.85)">常规: 1.85%</div>
+        <div class="tag rate-tag" onclick="setRate(2.55)">平均: 2.55%</div>
+        <div class="tag rate-tag" onclick="setRate(3.50)">高峰: 3.50%</div>
+      `;
     }
 
     function setRate(rate) {
