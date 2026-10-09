@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- 核心修复：隐藏 Referer，绕过财经 API 的跨域/域名拦截 -->
+  <meta name="referrer" content="no-referrer">
   <title>国债逆回购计算器</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -121,24 +123,30 @@
       fetchRatesFromClient();
     };
 
-    // 支持 HTTPS 的行情获取机制（新浪 API 优先，腾讯 API 备用）
     function fetchRatesFromClient() {
       const container = document.getElementById('marketRateTags');
       container.innerHTML = '<div class="tag rate-tag">正在获取实时盘面...</div>';
 
+      // 动态注入腾讯财经行情 JS
+      const scriptId = 'qq_market_script';
+      const oldScript = document.getElementById(scriptId);
+      if (oldScript) oldScript.remove();
+
       const script = document.createElement('script');
-      script.src = 'https://hq.sinajs.cn/list=sh201001,sz131810';
-      
+      script.id = scriptId;
+      // 加上随机时间戳防缓存
+      script.src = 'https://qt.gtimg.cn/q=sz131810,sh201001&_=' + new Date().getTime();
+
       script.onload = function() {
         try {
           let gc001 = 0, r001 = 0;
-          if (typeof hq_str_sh201001 !== 'undefined' && hq_str_sh201001) {
-            const fields = hq_str_sh201001.split(',');
-            gc001 = parseFloat(fields[3]) || parseFloat(fields[2]) || 0;
+          if (typeof v_sh201001 !== 'undefined' && v_sh201001) {
+            const shData = v_sh201001.split('~');
+            gc001 = parseFloat(shData[3]) || parseFloat(shData[4]) || 0;
           }
-          if (typeof hq_str_sz131810 !== 'undefined' && hq_str_sz131810) {
-            const fields = hq_str_sz131810.split(',');
-            r001 = parseFloat(fields[3]) || parseFloat(fields[2]) || 0;
+          if (typeof v_sz131810 !== 'undefined' && v_sz131810) {
+            const szData = v_sz131810.split('~');
+            r001 = parseFloat(szData[3]) || parseFloat(szData[4]) || 0;
           }
 
           if (gc001 > 0 || r001 > 0) {
@@ -149,50 +157,13 @@
               <div class="tag rate-tag" onclick="setRate(${gc001.toFixed(3)})">沪GC001: ${gc001.toFixed(3)}%</div>
               <div class="tag rate-tag" onclick="setRate(${r001.toFixed(3)})">深R-001: ${r001.toFixed(3)}%</div>
             `;
-            if (document.body.contains(script)) document.body.removeChild(script);
             return;
           }
-        } catch(e) {}
-        if (document.body.contains(script)) document.body.removeChild(script);
-        fetchRatesFallback();
+        } catch (e) {}
+        setDefaultRates();
       };
 
       script.onerror = function() {
-        if (document.body.contains(script)) document.body.removeChild(script);
-        fetchRatesFallback();
-      };
-
-      document.body.appendChild(script);
-    }
-
-    // 备用通道：腾讯接口
-    function fetchRatesFallback() {
-      const script = document.createElement('script');
-      script.src = 'https://qt.gtimg.cn/q=sz131810,sh201001';
-      
-      script.onload = function() {
-        try {
-          if (typeof v_sh201001 !== 'undefined') {
-            const shData = v_sh201001.split('~');
-            const szData = v_sz131810.split('~');
-            const gc001 = parseFloat(shData[3]) || parseFloat(shData[4]) || 1.85;
-            const r001 = parseFloat(szData[3]) || parseFloat(szData[4]) || 1.80;
-            setRate(gc001);
-            document.getElementById('marketRateTags').innerHTML = `
-              <div class="tag rate-tag" onclick="setRate(${gc001.toFixed(3)})">沪GC001: ${gc001.toFixed(3)}%</div>
-              <div class="tag rate-tag" onclick="setRate(${r001.toFixed(3)})">深R-001: ${r001.toFixed(3)}%</div>
-            `;
-          } else {
-            setDefaultRates();
-          }
-        } catch(e) {
-          setDefaultRates();
-        }
-        if (document.body.contains(script)) document.body.removeChild(script);
-      };
-      
-      script.onerror = function() {
-        if (document.body.contains(script)) document.body.removeChild(script);
         setDefaultRates();
       };
 
