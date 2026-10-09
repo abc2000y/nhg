@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#3370ff">
-<title>国债逆回购计算器</title>
+<title>国债逆回购收益测算</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;padding:14px;color:#1f2329;max-width:760px;margin:auto}
@@ -140,6 +140,19 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 5px;b
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'repo_calculator_records_v2';
 let latestCalculation = null;
+
+// 各天数品种对应的证券代码映射表（沪市 / 深市）
+const CODE_MAP = {
+  1:   { sh: 'sh201001', sz: 'sz131810', shName: 'GC001', szName: 'R-001' },
+  2:   { sh: 'sh201002', sz: 'sz131811', shName: 'GC002', szName: 'R-002' },
+  3:   { sh: 'sh201003', sz: 'sz131800', shName: 'GC003', szName: 'R-003' },
+  4:   { sh: 'sh201004', sz: 'sz131809', shName: 'GC004', szName: 'R-004' },
+  7:   { sh: 'sh201007', sz: 'sz131801', shName: 'GC007', szName: 'R-007' },
+  14:  { sh: 'sh201014', sz: 'sz131802', shName: 'GC014', szName: 'R-014' },
+  28:  { sh: 'sh201028', sz: 'sz131803', shName: 'GC028', szName: 'R-028' },
+  91:  { sh: 'sh201091', sz: 'sz131805', shName: 'GC091', szName: 'R-091' },
+  182: { sh: 'sh201182', sz: 'sz131806', shName: 'GC182', szName: 'R-182' }
+};
 
 function parseLocalDate(value) {
   if (!value) return null;
@@ -307,32 +320,40 @@ $('importJson').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-// 行情获取函数（自动挑选有效非0利率，并更新填入第一个快捷标签）
-$('refreshRate').addEventListener('click', () => {$('rateStatus').textContent = '正在获取实时盘面...';
+// 动态行情获取函数：根据选中的【品种天数】加载对应交易所代码行情
+$('refreshRate').addEventListener('click', () => {
+  const days = parseInt($('nominalDays').value) || 1;
+  const targetCode = CODE_MAP[days] || CODE_MAP[1]; // 若不是标准天数则默认取1天期
+
+  $('rateStatus').textContent = `正在获取 [${days}天期] 实时盘面...`;
   const oldScript = document.getElementById('market_script');
   if (oldScript) oldScript.remove();
 
   const script = document.createElement('script');
   script.id = 'market_script';
-  script.src = 'https://qt.gtimg.cn/q=sz131810,sh201001&_=' + Date.now();
+  // 动态拼装天数对应的沪深两市行情代码
+  script.src = `https://qt.gtimg.cn/q=${targetCode.sz},${targetCode.sh}&_=` + Date.now();
 
   script.onload = function() {
     try {
-      let gc001 = 0, r001 = 0;
-      if (typeof v_sh201001 !== 'undefined' && v_sh201001) {
-        gc001 = parseFloat(v_sh201001.split('~')[3]) || 0;
+      let shRate = 0, szRate = 0;
+      const shVar = `v_${targetCode.sh}`;
+      const szVar = `v_${targetCode.sz}`;
+
+      if (typeof window[shVar] !== 'undefined' && window[shVar]) {
+        shRate = parseFloat(window[shVar].split('~')[3]) || 0;
       }
-      if (typeof v_sz131810 !== 'undefined' && v_sz131810) {
-        r001 = parseFloat(v_sz131810.split('~')[3]) || 0;
+      if (typeof window[szVar] !== 'undefined' && window[szVar]) {
+        szRate = parseFloat(window[szVar].split('~')[3]) || 0;
       }
 
-      // 优先取有值的行情（优先沪市，若沪市为0则自动取深市）
-      const validRate = gc001 > 0 ? gc001 : (r001 > 0 ? r001 : 0);
+      // 优先取非0有效值（优先沪市，若沪市为0则自动取深市）
+      const validRate = shRate > 0 ? shRate : (szRate > 0 ? szRate : 0);
 
       if (validRate > 0) {
         const rateVal = validRate.toFixed(3);
         
-        // 1. 填入输入框
+        // 1. 填入利率输入框
         $('annualRate').value = rateVal;
 
         // 2. 更新最左侧第一个点选框，并激活选中状态
@@ -346,9 +367,9 @@ $('refreshRate').addEventListener('click', () => {$('rateStatus').textContent = 
           });
         }
 
-        $('rateStatus').textContent = `已更新 | 沪GC001: ${gc001}%，深R-001: ${r001}%（以券商成交价为准）`;
+        $('rateStatus').textContent = `已更新 [${days}天期] | 沪${targetCode.shName}: ${shRate}%，深${targetCode.szName}: ${szRate}%`;
       } else {
-        $('rateStatus').textContent = '当前非交易时间（15:30后或周末盘面无报价），请手动输入。';
+        $('rateStatus').textContent = `当前非交易时间（15:30后或周末）或 [${days}天期] 盘面无报价，请手动输入。`;
       }
     } catch(e) {
       $('rateStatus').textContent = '行情解析失败，请手动输入。';
