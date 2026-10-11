@@ -13,13 +13,14 @@ body{background:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 .card{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 2px 8px #172b4d0a}
 h2{font-size:14px;margin-bottom:10px}
 
-.form-line{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px}
-.form-line label,.form-line .label{font-size:13px;font-weight:550;white-space:nowrap;width:72px;color:#333;flex-shrink:0}
-.input-group-row{flex:1;display:flex;gap:6px;align-items:center}
+/* 缩窄左侧标签宽度，减小间距 */
+.form-line{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:4px}
+.form-line label,.form-line .label{font-size:13px;font-weight:550;white-space:nowrap;width:60px;color:#333;flex-shrink:0}
+.input-group-row{flex:1;display:flex;gap:4px;align-items:center}
 .input-with-tags{flex:1;display:flex;flex-direction:column;gap:4px}
 
 .hint{font-size:11px;color:#7b8494;line-height:1.4;margin-top:2px}
-input,select{height:38px;border:1px solid #d9dee8;border-radius:6px;padding:0 8px;font-size:14px;background:#fff;color:#1f2329;width:100%}
+input,select{height:38px;border:1px solid #d9dee8;border-radius:6px;padding:0 6px;font-size:13px;background:#fff;color:#1f2329;width:100%}
 
 .quick-tags{display:flex;gap:4px;flex-wrap:wrap}
 .tag{flex:1;min-width:38px;text-align:center;padding:5px 2px;background:#f1f3f7;border-radius:4px;font-size:11px;cursor:pointer;border:1px solid transparent}
@@ -49,7 +50,7 @@ button{border:0;cursor:pointer;font-size:13px;border-radius:6px;padding:8px 10px
 .totalgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.totalbox{background:#f7f9fc;border-radius:6px;padding:8px}.totalbox .k{font-size:11px;color:#7b8494}.totalbox .v{font-size:16px;font-weight:750;margin-top:2px;overflow-wrap:anywhere}
 table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:#7b8494;font-weight:600}
 .tablewrap{overflow-x:auto}.empty{text-align:center;color:#8b93a1;padding:12px 0;font-size:12px}
-.footer{font-size:10px;color:#7b8494;line-height:1.4;padding:0 2px 10px}
+.footer{font-size:10px;color:#8b93a1;line-height:1.4;padding:0 2px 10px}
 </style>
 </head>
 <body>
@@ -104,24 +105,22 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
     </div>
   </div>
 
-  <!-- 年化与佣金同行：佣金输入框与下拉选择条 1:1 各占一半 -->
+  <!-- 年化率%、常用佣金、佣金数值 三栏均分 (1:1:1) -->
   <div class="form-line" style="align-items:flex-start;">
     <label for="annualRate" style="padding-top:8px;">年化率%</label>
     <div class="input-with-tags">
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:4px;">
         <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.550" placeholder="年化%" style="flex:1;">
-        <div style="flex:1;display:flex;gap:4px;">
-          <select id="quickFeeSelect" style="flex:1;padding:0 4px;font-size:12px;" title="常用参考">
-            <option value="0.00001">常用佣金</option>
-            <option value="0.00001">0.001%</option>
-            <option value="0.00002">0.002%</option>
-            <option value="0.00003">0.003%</option>
-            <option value="0.00005">0.005%</option>
-            <option value="0.000001">优惠佣金</option>
-            <option value="0">0%</option>
-          </select>
-          <input type="number" id="feeRate" min="0" step="0.00001" value="0.00001" placeholder="佣金" style="flex:1;">
-        </div>
+        <select id="quickFeeSelect" style="flex:1;padding:0 2px;font-size:12px;" title="常用参考">
+          <option value="0.00001">常用佣金</option>
+          <option value="0.00001">0.001%</option>
+          <option value="0.00002">0.002%</option>
+          <option value="0.00003">0.003%</option>
+          <option value="0.00005">0.005%</option>
+          <option value="0.000001">优惠佣金</option>
+          <option value="0">0%</option>
+        </select>
+        <input type="number" id="feeRate" min="0" step="0.00001" value="0.00001" placeholder="佣金" style="flex:1;">
       </div>
       <button type="button" class="full-width-btn" id="refreshRate">
         一键获取全品种年化利率 ↻
