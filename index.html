@@ -70,7 +70,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
 
 <div class="card">
   <h2>交易参数</h2>
-  
+
   <div class="form-line">
     <label for="tradeDate">交易日期</label>
     <input type="date" id="tradeDate" style="flex:1;">
@@ -103,14 +103,14 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
       </select>
     </div>
   </div>
-  
+
   <!-- 年化与佣金同行：佣金输入框与下拉选择条 1:1 各占一半 -->
   <div class="form-line" style="align-items:flex-start;">
-    <label for="annualRate" style="padding-top:6px;">年化与佣金</label>
+    <label for="annualRate" style="padding-top:6px;">年化率%</label>
     <div class="input-with-tags">
       <div style="display:flex;gap:6px;">
         <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.550" placeholder="年化%" style="flex:1;">
-        
+        <label for="annualRate" style="padding-top:6px;">佣金</label>
         <div style="flex:1;display:flex;gap:4px;">
           <input type="number" id="feeRate" min="0" step="0.00001" value="0.00001" placeholder="佣金" style="flex:1;">
           <select id="quickFeeSelect" style="flex:1;padding:0 4px;font-size:12px;" title="常用参考">
@@ -251,7 +251,7 @@ function renderRecords() {
   $('totalAmount').textContent = fmtMoney(sum('amount'));
   $('totalGross').textContent = fmtMoney(sum('gross'));$('totalFee').textContent = fmtMoney(sum('fee'));
   $('totalNet').textContent = fmtMoney(sum('net'));$('averageNet').textContent = fmtMoney(records.length ? sum('net')/records.length : 0);
-  
+
   const body = $('recordsBody');
   body.innerHTML = '';
   if (!records.length) {
@@ -296,7 +296,7 @@ function calculate() {
   const fee = amount * feeRate;
   const net = gross - fee;
   const effectiveRate = amount > 0 && actualDays > 0 ? net / amount / actualDays * 365 * 100 : 0;
-  
+
   const available = new Date(finalSettlement);
   const withdrawable = nextWeekday(finalSettlement);
 
@@ -311,7 +311,7 @@ function calculate() {
 
   $('resultCard').hidden = false;
   $('netIncome').textContent = fmtMoney(net);$('actualRate').textContent = effectiveRate.toFixed(3) + '%';
-  
+
   const diffRate = effectiveRate - BANK_BENCHMARK;
   if (diffRate >= 0) {
     $('benchmarkResult').textContent = `高出 +${diffRate.toFixed(3)}%`;
@@ -340,7 +340,7 @@ $('quickFeeSelect').addEventListener('change', e => {
 $('dayTags').addEventListener('click', e => {
   const tag = e.target.closest('[data-days]'); if (!tag) return;
   const days = Number(tag.dataset.days);
-  $('nominalDays').value = days; 
+  $('nominalDays').value = days;
   document.querySelectorAll('#dayTags .tag').forEach(t => t.classList.toggle('active', t === tag));
   if (rateCache[days]) {
     $('annualRate').value = rateCache[days].toFixed(3);
