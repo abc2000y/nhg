@@ -80,7 +80,6 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
     <label for="nominalDays" style="padding-top:6px;">品种期限</label>
     <div class="input-with-tags">
       <input type="number" id="nominalDays" min="1" max="182" step="1" value="1">
-      <!-- 调整为 1天、2天、3天、4天、7天 -->
       <div class="quick-tags" id="dayTags">
         <div class="tag active" data-days="1">1天</div>
         <div class="tag" data-days="2">2天</div>
@@ -119,6 +118,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
           <option value="0">0% (免佣)</option>
         </select>
       </div>
+      <!-- 已恢复的一键获取全品种年化按钮 -->
       <button type="button" class="full-width-btn" id="refreshRate">
         一键获取全品种年化利率 ↻
       </button>
@@ -133,7 +133,6 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
   <h2>本次测算结果</h2>
   <div class="stats">
     <div class="stat primaryStat"><div class="statLabel">预计净收益</div><div class="statNum red" id="netIncome">￥0.00</div></div>
-    <!-- 扣佣后实际年化保留小数点后3位 -->
     <div class="stat"><div class="statLabel">扣佣后实际年化</div><div class="statNum green" id="actualRate">0.000%</div></div>
   </div>
 
@@ -166,106 +165,4 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
     <div class="totalbox"><div class="k">累计净收益</div><div class="v red" id="totalNet">￥0.00</div></div>
     <div class="totalbox"><div class="k">平均每笔净收益</div><div class="v" id="averageNet">￥0.00</div></div>
   </div>
-  <div class="tablewrap" style="margin-top:8px">
-    <table><thead><tr><th>日期</th><th>期限</th><th>金额</th><th>净收益</th><th>操作</th></tr></thead><tbody id="recordsBody"></tbody></table>
-  </div>
-  <div class="toolbar" style="margin-top:8px">
-    <button type="button" class="secondary small" id="exportCsv">导出CSV</button>
-    <button type="button" class="secondary small" id="backupJson">备份JSON</button>
-    <label class="secondary small" style="display:inline-flex;align-items:center;gap:3px;cursor:pointer">导入<input type="file" id="importJson" accept=".json,application/json" style="display:none"></label>
-  </div>
-</div>
-<div class="footer">
-  测算结果仅供参考，实际以券商结算为准。
-</div>
-
-<script>
-'use strict';
-const $ = id => document.getElementById(id);
-const STORAGE_KEY = 'repo_calculator_records_v5';
-let latestCalculation = null;
-
-const BANK_BENCHMARK = 1.35;
-
-$('noticeBox').addEventListener('click', () => {
-  const box = $('noticeBox');
-  const isOpened = box.classList.toggle('open');
-  $('noticeArrow').textContent = isOpened ? '▲' : '▼';
-});
-
-const CODE_MAP = {
-  1: { sh: 'sh201001', sz: 'sz131810', name: '1天' },
-  2: { sh: 'sh201002', sz: 'sz131811', name: '2天' },
-  3: { sh: 'sh201003', sz: 'sz131800', name: '3天' },
-  4: { sh: 'sh201004', sz: 'sz131809', name: '4天' },
-  7: { sh: 'sh201007', sz: 'sz131801', name: '7天' }
-};
-
-const rateCache = {};
-
-function parseLocalDate(value) {
-  if (!value) return null;
-  const parts = value.split('-').map(Number);
-  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
-  const d = new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0, 0);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-function dateString(date) {
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-}
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-function isWeekend(date) { return date.getDay() === 0 || date.getDay() === 6; }
-function nextWeekday(date, includeToday=false) {
-  let d = new Date(date);
-  if (!includeToday) d = addDays(d, 1);
-  while (isWeekend(d)) d = addDays(d, 1);
-  return d;
-}
-function fmtMoney(n) {
-  return new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n)||0);
-}
-function fmtDate(d) { return dateString(d); }
-
-function readRecords() {
-  try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(data) ? data.filter(r => r && typeof r.id === 'string' && Number.isFinite(Number(r.net))) : [];
-  } catch (e) { return []; }
-}
-function writeRecords(records) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); return true; }
-  catch (e) { alert('保存失败'); return false; }
-}
-function renderRecords() {
-  const records = readRecords();
-  const sum = key => records.reduce((acc,r)=>acc+(Number(r[key])||0),0);
-  $('totalCount').textContent = records.length;
-  $('totalAmount').textContent = fmtMoney(sum('amount'));
-  $('totalGross').textContent = fmtMoney(sum('gross'));$('totalFee').textContent = fmtMoney(sum('fee'));
-  $('totalNet').textContent = fmtMoney(sum('net'));$('averageNet').textContent = fmtMoney(records.length ? sum('net')/records.length : 0);
-  
-  const body = $('recordsBody');
-  body.innerHTML = '';
-  if (!records.length) {
-    const tr = document.createElement('tr'), td = document.createElement('td');
-    td.colSpan = 5; td.className = 'empty'; td.textContent = '暂无记录';
-    tr.appendChild(td); body.appendChild(tr); return;
-  }
-  records.slice().reverse().forEach(r => {
-    const tr = document.createElement('tr');
-    [r.tradeDate, `${r.days}天`, fmtMoney(r.amount), fmtMoney(r.net)].forEach(value => {
-      const td = document.createElement('td'); td.textContent = value; tr.appendChild(td);
-    });
-    const td = document.createElement('td'), btn = document.createElement('button');
-    btn.className = 'danger small'; btn.textContent = '删';
-    btn.addEventListener('click', () => {
-      if (!confirm('确定删除？')) return;
-      writeRecords(readRecords().filter(x => x.id !== r.id)); renderRecords();
-    });
-    td.appendChild(btn); tr.appendChild(td); body.appendChild(tr);
-  });
-}
+  <div class="
