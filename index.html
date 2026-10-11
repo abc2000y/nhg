@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#3370ff">
-<title>国债逆回购计算器</title>
+
+<!-- 网页标题 -->
+<title>国债逆回购收益测算</title>
+
+<!-- 微信/社交平台分享卡片配置（自动读取 tt.png 作为封面图片） -->
+<meta property="og:title" content="国债逆回购收益测算">
+<meta property="og:description" content="手机极简版 · 扣佣实际年化 · 自动对比定期收益">
+<meta property="og:image" content="tt.png">
+<link rel="icon" href="tt.png" type="image/png">
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;padding:10px;color:#1f2329;max-width:760px;margin:auto}
@@ -13,7 +22,6 @@ body{background:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 .card{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 2px 8px #172b4d0a}
 h2{font-size:14px;margin-bottom:10px}
 
-/* 缩窄左侧标签宽度，减小间距 */
 .form-line{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:4px}
 .form-line label,.form-line .label{font-size:13px;font-weight:550;white-space:nowrap;width:60px;color:#333;flex-shrink:0}
 .input-group-row{flex:1;display:flex;gap:4px;align-items:center}
@@ -39,7 +47,10 @@ button{border:0;cursor:pointer;font-size:13px;border-radius:6px;padding:8px 10px
 
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.stat{background:#f6f8fb;border-radius:8px;padding:10px;text-align:center;min-width:0}.stat.primaryStat{background:#fff0f0}
 .statLabel{font-size:11px;color:#7b8494}.statNum{font-size:18px;font-weight:750;margin-top:3px;overflow-wrap:anywhere}.red{color:#e5484d}.blue{color:#245bdb}.green{color:#16803c}
-.benchmark-box{background:#f0f5ff;border:1px dashed #3370ff;border-radius:6px;padding:8px 10px;margin:6px 0;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+
+.benchmark-box{background:#f0f5ff;border:1px dashed #3370ff;border-radius:6px;padding:6px 10px;margin:6px 0;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.benchmark-box .benchmark-input-group{display:flex;align-items:center;gap:4px}
+.benchmark-box input{height:28px;width:58px;padding:0 4px;text-align:center;font-size:12px;font-weight:600}
 
 .results-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
 .result-item{background:#f7f9fc;border-radius:6px;padding:8px;font-size:12px;display:flex;flex-direction:column;gap:2px}
@@ -105,7 +116,6 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
     </div>
   </div>
 
-  <!-- 年化率%、常用佣金、佣金数值 三栏均分 (1:1:1) -->
   <div class="form-line" style="align-items:flex-start;">
     <label for="annualRate" style="padding-top:8px;">年化率%</label>
     <div class="input-with-tags">
@@ -140,7 +150,10 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
   </div>
 
   <div class="benchmark-box">
-    <span>定期基准对比 (1.35%)：</span>
+    <div class="benchmark-input-group">
+      <span>定期基准(%):</span>
+      <input type="number" id="bankBenchmark" step="0.01" value="1.30" min="0" max="100">
+    </div>
     <strong id="benchmarkResult" class="red">高出 +0.000%</strong>
   </div>
 
@@ -184,10 +197,8 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
-const STORAGE_KEY = 'repo_calculator_records_v7';
+const STORAGE_KEY = 'repo_calculator_records_v10';
 let latestCalculation = null;
-
-const BANK_BENCHMARK = 1.35;
 
 $('noticeBox').addEventListener('click', () => {
   const box = $('noticeBox');
@@ -278,6 +289,7 @@ function calculate() {
   const amount = Number($('amount').value);
   const rate = Number($('annualRate').value);
   const feeRate = Number($('feeRate').value);
+  const bankBenchmark = Number($('bankBenchmark').value) || 1.30;
 
   if (!tradeDate) return alert('请选择有效交易日期。');
   if (isWeekend(tradeDate)) return alert('所选日期是周末，请选择工作日。');
@@ -295,6 +307,9 @@ function calculate() {
   const net = gross - fee;
   const effectiveRate = amount > 0 && actualDays > 0 ? net / amount / actualDays * 365 * 100 : 0;
 
+  const benchmarkNet = amount * (bankBenchmark / 100) * actualDays / 365;
+  const diffAmount = net - benchmarkNet;
+
   const available = new Date(finalSettlement);
   const withdrawable = nextWeekday(finalSettlement);
 
@@ -310,13 +325,15 @@ function calculate() {
   $('resultCard').hidden = false;
   $('netIncome').textContent = fmtMoney(net);$('actualRate').textContent = effectiveRate.toFixed(3) + '%';
 
-  const diffRate = effectiveRate - BANK_BENCHMARK;
+  const diffRate = effectiveRate - bankBenchmark;
+  const benchmarkResultEl = $('benchmarkResult');
   if (diffRate >= 0) {
-    $('benchmarkResult').textContent = `高出 +${diffRate.toFixed(3)}%`;
-    $('benchmarkResult').className = 'red';
+    benchmarkResultEl.textContent = `高出 +${diffRate.toFixed(3)}% (多赚 ${fmtMoney(diffAmount)})`;
+    benchmarkResultEl.className = 'red';
   } else {
-    $('benchmarkResult').textContent = `低于 ${diffRate.toFixed(3)}%`;
-    $('benchmarkResult').className = 'green';
+    const shortAmount = Math.abs(diffAmount);
+    benchmarkResultEl.textContent = `低于 ${diffRate.toFixed(3)}% (少赚 ${fmtMoney(shortAmount)})`;
+    benchmarkResultEl.className = 'green';
   }
 
   $('grossInterest').textContent = fmtMoney(gross);
@@ -350,6 +367,14 @@ $('nominalDays').addEventListener('input', () => {
   const val = Number($('nominalDays').value);
   document.querySelectorAll('#dayTags .tag').forEach(t => {
     t.classList.toggle('active', Number(t.dataset.days) === val);
+  });
+});
+
+['annualRate', 'feeRate', 'amount', 'nominalDays', 'tradeDate', 'bankBenchmark'].forEach(id => {
+  $(id).addEventListener('input', () => {
+    if (!$('resultCard').hidden) {
+      calculate();
+    }
   });
 });
 
@@ -415,7 +440,11 @@ function fetchAllRates() {
         }
       });
       const cur = parseInt($('nominalDays').value) || 1;
-      if (rateCache[cur]) $('annualRate').value = rateCache[cur].toFixed(3);$('rateStatus').textContent = count > 0 ? `成功更新 ${count} 个品种行情` : '当前非交易时间无盘面报价';
+      if (rateCache[cur]) {
+        $('annualRate').value = rateCache[cur].toFixed(3);
+        if (!$('resultCard').hidden) calculate();
+      }
+      $('rateStatus').textContent = count > 0 ? `成功更新 ${count} 个品种行情` : '当前非交易时间无盘面报价';
     } catch(e) { $('rateStatus').textContent = '解析异常'; }
     script.remove();
   };
