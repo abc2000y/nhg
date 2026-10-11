@@ -49,7 +49,7 @@ button{border:0;cursor:pointer;font-size:13px;border-radius:6px;padding:8px 10px
 .totalgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.totalbox{background:#f7f9fc;border-radius:6px;padding:8px}.totalbox .k{font-size:11px;color:#7b8494}.totalbox .v{font-size:16px;font-weight:750;margin-top:2px;overflow-wrap:anywhere}
 table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:#7b8494;font-weight:600}
 .tablewrap{overflow-x:auto}.empty{text-align:center;color:#8b93a1;padding:12px 0;font-size:12px}
-.footer{font-size:10px;color:#8b93a1;line-height:1.4;padding:0 2px 10px}
+.footer{font-size:10px;color:#7b8494;line-height:1.4;padding:0 2px 10px}
 </style>
 </head>
 <body>
@@ -104,21 +104,26 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
     </div>
   </div>
   
+  <!-- 年化与佣金同行：佣金输入框与下拉选择条 1:1 各占一半 -->
   <div class="form-line" style="align-items:flex-start;">
     <label for="annualRate" style="padding-top:6px;">年化与佣金</label>
     <div class="input-with-tags">
       <div style="display:flex;gap:6px;">
-        <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.550" placeholder="年化%" style="flex:1.1;">
-        <select id="feeRate" style="flex:1.4;" title="佣金费率">
-          <option value="0.00001">0.001% (常见)</option>
-          <option value="0.00002">0.002% (参考)</option>
-          <option value="0.00003">0.003% (参考)</option>
-          <option value="0.00005">0.005% (参考)</option>
-          <option value="0.0001">0.010% (参考)</option>
-          <option value="0">0% (免佣)</option>
-        </select>
+        <input type="number" id="annualRate" min="0" max="100" step="0.001" value="2.550" placeholder="年化%" style="flex:1;">
+        
+        <div style="flex:1;display:flex;gap:4px;">
+          <input type="number" id="feeRate" min="0" step="0.00001" value="0.00001" placeholder="佣金" style="flex:1;">
+          <select id="quickFeeSelect" style="flex:1;padding:0 4px;font-size:12px;" title="常用参考">
+            <option value="">常用</option>
+            <option value="0.00001">0.001%</option>
+            <option value="0.00002">0.002%</option>
+            <option value="0.00003">0.003%</option>
+            <option value="0.00005">0.005%</option>
+            <option value="0.0001">0.010%</option>
+            <option value="0">0%</option>
+          </select>
+        </div>
       </div>
-      <!-- 已恢复的一键获取全品种年化按钮 -->
       <button type="button" class="full-width-btn" id="refreshRate">
         一键获取全品种年化利率 ↻
       </button>
@@ -181,7 +186,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:6px 3px;b
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
-const STORAGE_KEY = 'repo_calculator_records_v5';
+const STORAGE_KEY = 'repo_calculator_records_v7';
 let latestCalculation = null;
 
 const BANK_BENCHMARK = 1.35;
@@ -281,6 +286,7 @@ function calculate() {
   if (!Number.isInteger(days) || days < 1 || days > 182) return alert('期限必须是 1-182 整数。');
   if (!Number.isFinite(amount) || amount < 1000) return alert('投资金额至少 1000 元。');
   if (!Number.isFinite(rate) || rate < 0 || rate > 100) return alert('请输入合法年化利率。');
+  if (!Number.isFinite(feeRate) || feeRate < 0) return alert('请输入合法佣金费率。');
 
   const firstSettlement = nextWeekday(tradeDate);
   const targetDate = addDays(firstSettlement, days);
@@ -326,6 +332,10 @@ $('quickAmountSelect').addEventListener('change', e => {
   if (e.target.value) $('amount').value = e.target.value;
 });
 $('amount').addEventListener('input', () => {$('quickAmountSelect').value = ''; });
+
+$('quickFeeSelect').addEventListener('change', e => {
+  if (e.target.value !== '') $('feeRate').value = e.target.value;
+});
 
 $('dayTags').addEventListener('click', e => {
   const tag = e.target.closest('[data-days]'); if (!tag) return;
